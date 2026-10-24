@@ -12,7 +12,7 @@ The opening window is now **1100 × 840**, so the two-panel design and divider a
 
 1. Select one email frame, component, or instance in Figma; refresh the selection when needed.
 2. Use Horizontal mode to add rows, then split a row into 2 columns, 3 columns, or custom columns. Click guides to remove them; Undo and Reset retain their existing behavior. Numbered preview labels open that slice's content review.
-3. Review text inclusion, the optional CTA, final alt text, and each slice's destination URL. Select All, Clear, text Copy, default URL, and “No CTA divider” remain available. Expand **Slice preview & location** for the original crop and email map.
+3. Review text inclusion, the optional CTA, final alt text, and each slice's destination URL. Next/Previous, slice chips and the jump selector locate the active slice in the email preview. Click the **Slice N of M** indicator to locate it again without changing any edits. Fitting slices are centered; tall slices align near the top. Only the preview scrolls, using smooth motion unless reduced motion is enabled. Select All, Clear, text Copy, default URL, and “No CTA divider” remain available. Expand **Slice preview & location** for the original crop and email map.
 4. Choose a Klaviyo account with the searchable dropdown. Search appears inside the panel only, resets on opening, and uses the already loaded account list. Refresh retains a still-valid selected account ID. Advanced settings retain the backend URL/token, automatic export scale, and JPEG ZIP download.
 5. **Prepare & upload images**, then **Create Klaviyo template**. Preparation, compression/upload, and creation remain separate operations with their existing validation, progress messages, and debug results. Full-width JPEG export remains 1200 px.
 
@@ -47,6 +47,7 @@ Browser regression tests use an externally available Playwright installation and
 ```sh
 node tests/klaviyo-account-search.cjs
 node tests/redesign-workflow.cjs
+node tests/active-slice-scroll.cjs
 node tests/ui-preferences.cjs
 ```
 

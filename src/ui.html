@@ -122,6 +122,12 @@
     .review-toolbar { padding: 12px 16px; border-bottom: 1px solid var(--ii-border); background: var(--ii-bg); }
     .review-nav { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 8px; align-items: center; }
     .review-nav button { padding: 0 8px; font-size: 11px; }
+    .review-current-slice { position: relative; display: flex; min-width: 0; }
+    .review-nav .review-locate-slice { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 6px 0 0 6px; font-variant-numeric: tabular-nums; }
+    .review-nav .review-locate-slice:hover { background: var(--ii-accent-soft); }
+    .review-nav .review-jump-select { flex: 0 0 28px; width: 28px; min-width: 28px; padding: 0; appearance: none; color: transparent; border-left: 0; border-radius: 0 6px 6px 0; cursor: pointer; }
+    .review-jump-select option { color: var(--ii-text); background: var(--ii-bg); }
+    .review-current-slice::after { content: '▾'; position: absolute; right: 9px; top: 50%; transform: translateY(-50%); color: var(--ii-muted); pointer-events: none; }
     .review-progress { display: flex; align-items: center; gap: 12px; margin-top: 10px; color: var(--ii-muted); font-size: 11px; }
     .review-progress-track { flex: 1; min-width: 28px; height: 4px; overflow: hidden; border-radius: 4px; background: #edf0f4; }
     .review-progress-fill { height: 100%; background: #00a4df; border-radius: inherit; }
@@ -1368,6 +1374,54 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
   }
 
+  let activeSliceScrollFrame = 0;
+
+  function scrollActiveSliceIntoView() {
+    // Coalesce rapid navigation and let pending preview geometry updates settle.
+    cancelAnimationFrame(activeSliceScrollFrame);
+    let previousGeometry = null;
+    let stableFrames = 0;
+    const locate = () => {
+      activeSliceScrollFrame = 0;
+      const highlight = canvas.querySelector('.review-highlight');
+      if (!state.frame || !highlight || !previewWrap.clientHeight || !previewWrap.clientWidth) return;
+
+      const viewport = previewWrap.getBoundingClientRect();
+      const slice = highlight.getBoundingClientRect();
+      // Use scroll-content coordinates, accounting for the viewport border and
+      // canvas padding/centering. Rendered bounds already include canvasScale().
+      const top = slice.top - viewport.top - previewWrap.clientTop + previewWrap.scrollTop;
+      const left = slice.left - viewport.left - previewWrap.clientLeft + previewWrap.scrollLeft;
+      const geometry = [top, left, slice.width, slice.height, previewWrap.clientWidth, previewWrap.clientHeight, previewWrap.scrollWidth, previewWrap.scrollHeight];
+      stableFrames = previousGeometry && geometry.every((value, index) => Math.abs(value - previousGeometry[index]) < .5)
+        ? stableFrames + 1 : 0;
+      previousGeometry = geometry;
+      // ResizeObserver may schedule applyZoom and its scroll-anchor restoration
+      // in successive frames. Wait for stable bounds before starting smooth
+      // scrolling, otherwise that existing restoration can cancel the locate.
+      if (stableFrames < 2) {
+        activeSliceScrollFrame = requestAnimationFrame(locate);
+        return;
+      }
+      const inset = 16;
+      const targetTop = slice.height > previewWrap.clientHeight
+        ? top - inset
+        : top + (slice.height - previewWrap.clientHeight) / 2;
+      const targetLeft = slice.width > previewWrap.clientWidth
+        ? left - inset
+        : left + (slice.width - previewWrap.clientWidth) / 2;
+
+      // Scroll this canvas viewport only; scrollIntoView would move the outer
+      // workflow too, especially when the panels are stacked.
+      previewWrap.scrollTo({
+        top: Math.max(0, Math.min(previewWrap.scrollHeight - previewWrap.clientHeight, targetTop)),
+        left: Math.max(0, Math.min(previewWrap.scrollWidth - previewWrap.clientWidth, targetLeft)),
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+      });
+    };
+    activeSliceScrollFrame = requestAnimationFrame(locate);
+  }
+
   function setActiveReviewIndex(index) {
     const regions = buildUiRegions();
     if (!regions.length) {
@@ -1377,6 +1431,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
     state.activeReviewIndex = Math.max(0, Math.min(index, regions.length - 1));
     render();
+    scrollActiveSliceIntoView();
   }
 
   function makeSlicePreview(region) {
@@ -1535,8 +1590,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     previous.disabled = state.activeReviewIndex === 0;
     previous.onclick = () => setActiveReviewIndex(state.activeReviewIndex - 1);
 
+    const currentSlice = document.createElement('div');
+    currentSlice.className = 'review-current-slice';
+    const locate = document.createElement('button');
+    locate.type = 'button';
+    locate.className = 'review-locate-slice';
+    locate.textContent = `Slice ${item.region.number} of ${regions.length}`;
+    locate.title = 'Locate this slice in the email preview';
+    locate.setAttribute('aria-label', `Locate slice ${item.region.number} of ${regions.length} in email preview`);
+    locate.onclick = scrollActiveSliceIntoView;
+
     const selector = document.createElement('select');
+    selector.className = 'review-jump-select';
     selector.setAttribute('aria-label', 'Current slice');
+    selector.title = 'Jump to another slice';
     for (const entry of regionData) {
       const option = document.createElement('option');
       const entryKey = regionKey(entry.region);
@@ -1547,6 +1614,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
     selector.value = String(state.activeReviewIndex);
     selector.onchange = () => setActiveReviewIndex(Number(selector.value));
+    currentSlice.append(locate, selector);
 
     const next = document.createElement('button');
     next.textContent = 'Next →';
@@ -1554,7 +1622,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     next.onclick = () => setActiveReviewIndex(state.activeReviewIndex + 1);
 
     nav.appendChild(previous);
-    nav.appendChild(selector);
+    nav.appendChild(currentSlice);
     nav.appendChild(next);
     toolbar.appendChild(nav);
 
