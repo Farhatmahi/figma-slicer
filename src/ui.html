@@ -109,6 +109,8 @@
     #frameLockBtn[aria-pressed=true] { border-color: #b8e6f6; background: var(--ii-accent-soft); color: #006b95; }
     .frame-lock-status { padding: 0 16px 12px; color: var(--ii-muted); font-size: 11px; overflow-wrap: anywhere; }
     .frame-lock-status[data-missing=true] { color: var(--ii-error); }
+    .frame-selection-action { padding: 0 16px 12px; }
+    .frame-selection-action button { min-height: 30px; font-size: 11px; }
     .frame-switch-dialog { max-width: min(420px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--ii-border); border-radius: 8px; color: var(--ii-text); background: var(--ii-bg); box-shadow: 0 12px 40px rgb(16 24 40 / 18%); }
     .frame-switch-dialog::backdrop { background: rgb(16 24 40 / 35%); }
     .frame-switch-dialog h2 { margin: 0 0 12px; font-size: 16px; font-weight: 650; }
@@ -293,6 +295,7 @@
             <div class="card-head"><span class="card-number">1</span><div><h2 id="frameStepTitle" class="card-title">Select Frame</h2><div class="card-subtitle">Your selected design in Figma</div></div><div class="card-head-actions"><button id="refreshBtn" type="button">Refresh</button></div></div>
             <div class="card-body selected-frame"><img id="frameThumbnail" class="frame-thumbnail" alt="Selected frame thumbnail"><div class="frame-copy"><div id="frameName"></div><div id="frameMeta"></div></div><div class="frame-actions"><span class="frame-check" title="Frame selected" aria-label="Frame selected">✓</span><button id="frameLockBtn" type="button" aria-pressed="true" aria-label="Unlock working frame" disabled><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span id="frameLockLabel">Unlock</span></button></div></div>
             <div id="frameLockStatus" class="frame-lock-status" role="status">The working frame locks automatically.</div>
+            <div id="frameSelectionAction" class="frame-selection-action" hidden><button id="useSelectedFrameBtn" type="button" disabled>Use selected frame</button></div>
           </section>
           <section id="sliceStep" class="card workflow-step" aria-labelledby="sliceStepTitle">
             <div class="card-head"><span class="card-number">2</span><div><h2 id="sliceStepTitle" class="card-title">Slice Layout</h2><div class="card-subtitle">Create rows, then split them into columns</div></div></div>
@@ -437,6 +440,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     frame: null,
     frameLocked: true,
     frameMissing: false,
+    frameRevision: 0,
     layerBounds: [],
     textItems: [],
     previewUrl: null,
@@ -482,6 +486,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   let loadingFrameSwitch = null;
   let frameLockRequestPending = false;
   let framePreviewRevision = 0;
+  let nextFrameSelectionRequestId = 0;
+  let frameSelectionIntent = null;
+
+  function useSelectedCanvasFrame() {
+    if (workingFrameBusy() || frameLockRequestPending || frameSelectionIntent || (state.frame && state.frameLocked)) return;
+    frameSelectionIntent = { selectionRequestId: ++nextFrameSelectionRequestId, frameId: state.frame ? state.frame.id : null };
+    syncWorkingFrameControls();
+    parent.postMessage({ pluginMessage: { type: 'USE_CANVAS_SELECTION', ...frameSelectionIntent } }, '*');
+  }
 
   function hasWorkingFrameEdits() {
     return Boolean(state.horizontalCuts.length || state.history.length ||
@@ -499,7 +512,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   function syncWorkingFrameControls() {
     const locked = state.frameLocked;
     $('frameLockBtn').disabled = !state.frame || workingFrameBusy() || frameLockRequestPending;
-    $('refreshBtn').disabled = workingFrameBusy();
+    $('refreshBtn').disabled = workingFrameBusy() || Boolean(frameSelectionIntent);
+    $('frameSelectionAction').hidden = state.frameLocked;
+    $('useSelectedFrameBtn').disabled = state.frameLocked || workingFrameBusy() || frameLockRequestPending || Boolean(frameSelectionIntent);
+    $('emptyRefreshBtn').disabled = Boolean(frameSelectionIntent);
     $('frameLockBtn').setAttribute('aria-pressed', String(locked));
     $('frameLockBtn').setAttribute('aria-label', locked ? 'Unlock working frame' : 'Lock working frame');
     $('frameLockBtn').title = locked ? 'Keep this email active while selecting other Figma layers. Unlock to change it.' : 'Lock the current working frame';
@@ -507,7 +523,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     $('frameLockStatus').textContent = state.frameMissing
       ? 'Working frame deleted. Your work is kept here. Undo the deletion in Figma, or unlock and choose another frame.'
       : locked ? 'Working frame locked. Other canvas selections won’t change this email.'
-      : 'Unlocked. Select another frame in Figma, or use Refresh to switch intentionally.';
+      : 'Unlocked. Select a frame in Figma, then click Use selected frame here. Canvas clicks alone never switch this email.';
     $('frameLockStatus').dataset.missing = String(state.frameMissing);
     if (state.frameMissing) {
       $('prepareKlaviyo').disabled = true;
@@ -544,7 +560,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   function requestFrameSwitch(message) {
-    if (message.fromFrameId !== (state.frame && state.frame.id)) return;
+    if (state.frameLocked || !Number.isSafeInteger(message.requestId) || message.requestId <= 0 || !message.frame || typeof message.frame.id !== 'string' ||
+      !frameSelectionIntent || message.selectionRequestId !== frameSelectionIntent.selectionRequestId ||
+      message.fromFrameId !== frameSelectionIntent.frameId || message.fromFrameId !== (state.frame && state.frame.id)) {
+      parent.postMessage({ pluginMessage: { type: 'FRAME_SWITCH_DECISION', requestId: message.requestId, accept: false } }, '*');
+      return;
+    }
+    frameSelectionIntent = null;
+    syncWorkingFrameControls();
     if (workingFrameBusy()) {
       parent.postMessage({ pluginMessage: { type: 'FRAME_SWITCH_DECISION', requestId: message.requestId, accept: false } }, '*');
       showToast('Wait for the current export, upload or template creation to finish before switching frames.', 'warning');
@@ -972,7 +995,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       document.documentElement.style.setProperty('--notification-space', `${height}px`);
     }).observe($('toastRegion'));
     window.addEventListener('resize', updateWindowAction);
-    $('emptyRefreshBtn').onclick = () => post({ type: 'REFRESH_SELECTION' });
+    $('emptyRefreshBtn').textContent = 'Use selected frame';
+    $('emptyRefreshBtn').onclick = useSelectedCanvasFrame;
     updateWindowAction();
     post({ type: 'GET_UI_PREFERENCES' });
 
@@ -2287,7 +2311,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const message = event.data.pluginMessage;
     if (!message) return;
 
-    if (message.type === 'WORKING_FRAME_LOCK_STATE' && state.frame && message.frameId === state.frame.id) {
+    if (message.type === 'WORKING_FRAME_METADATA' && state.frame && message.frameId === state.frame.id && message.revision === state.frameRevision) {
+      state.frame.name = message.name;
+      $('frameName').textContent = message.name;
+      $('frameName').title = message.name;
+    }
+    if (message.type === 'WORKING_FRAME_LOCK_STATE' && state.frame && message.frameId === state.frame.id &&
+      (message.revision === undefined || message.revision === state.frameRevision)) {
       const wasMissing = state.frameMissing;
       state.frameLocked = message.locked;
       state.frameMissing = Boolean(message.missing);
@@ -2314,13 +2344,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       syncWorkingFrameControls();
     }
     if (message.type === 'WORKING_FRAME_SELECTION_NOTICE') {
-      finishFrameSwitchLoad();
+      if (frameSelectionIntent && message.selectionRequestId === frameSelectionIntent.selectionRequestId) frameSelectionIntent = null;
+      if (loadingFrameSwitch && message.selectionRequestId === loadingFrameSwitch.selectionRequestId) finishFrameSwitchLoad();
       frameLockRequestPending = false;
       $('status').textContent = message.message;
       syncWorkingFrameControls();
     }
 
     if (message.type === 'SELECTION_ERROR') {
+      if (frameSelectionIntent && message.selectionRequestId === frameSelectionIntent.selectionRequestId) frameSelectionIntent = null;
+      syncWorkingFrameControls();
       if (state.frame) {
         $('status').textContent = `Working frame unchanged. ${message.message}`;
         return;
@@ -2331,10 +2364,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     if (message.type === 'FRAME_READY') {
       const sameFrame = state.frame && state.frame.id === message.frame.id;
-      if (state.frame && !sameFrame && !message.switchConfirmed) {
-        $('status').textContent = 'Working frame unchanged. Unlock and confirm a frame switch before replacing this email.';
-        return;
-      }
+      const validRevision = Number.isSafeInteger(message.revision) && message.revision > 0;
+      if (validRevision && message.revision <= state.frameRevision) return;
+      if (state.frame && state.frameRevision > 0 && !validRevision) return;
+      if (state.frame && !sameFrame && (!loadingFrameSwitch || state.frameLocked || message.switchConfirmed !== true ||
+        message.requestId !== loadingFrameSwitch.requestId || message.selectionRequestId !== loadingFrameSwitch.selectionRequestId ||
+        message.fromFrameId !== state.frame.id || message.frame.id !== loadingFrameSwitch.frame.id)) return;
+      if (frameSelectionIntent && message.selectionRequestId === frameSelectionIntent.selectionRequestId) frameSelectionIntent = null;
+      if (validRevision) state.frameRevision = message.revision;
       const previewRevision = ++framePreviewRevision;
       const previousScroll = { top: previewWrap.scrollTop, left: previewWrap.scrollLeft };
       if (!sameFrame) {
@@ -2460,9 +2497,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   $('frameLockBtn').onclick = () => {
     if (!state.frame || workingFrameBusy() || frameLockRequestPending) return;
     frameLockRequestPending = true;
+    frameSelectionIntent = null;
     syncWorkingFrameControls();
     parent.postMessage({ pluginMessage: { type: 'SET_WORKING_FRAME_LOCK', frameId: state.frame.id, locked: !state.frameLocked } }, '*');
   };
+  $('useSelectedFrameBtn').onclick = useSelectedCanvasFrame;
+  $('refreshBtn').title = 'Refresh the working frame without using the canvas selection';
   $('cancelFrameSwitch').onclick = () => decideFrameSwitch(false);
   $('confirmFrameSwitch').onclick = () => decideFrameSwitch(true);
   $('frameSwitchDialog').addEventListener('cancel', event => {

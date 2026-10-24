@@ -27,7 +27,7 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
       await sendController(message);
     });
     await page.addInitScript(() => {
-      const requests = new Set(['GET_UI_PREFERENCES', 'SAVE_UI_PREFERENCES', 'UI_RESIZE', 'EXPORT', 'REFRESH_SELECTION', 'SET_WORKING_FRAME_LOCK', 'FRAME_SWITCH_DECISION', 'CLOSE']);
+      const requests = new Set(['GET_UI_PREFERENCES', 'SAVE_UI_PREFERENCES', 'UI_RESIZE', 'EXPORT', 'REFRESH_SELECTION', 'USE_CANVAS_SELECTION', 'SET_WORKING_FRAME_LOCK', 'FRAME_SWITCH_DECISION', 'CLOSE']);
       window.addEventListener('message', event => {
         const message = event.data && event.data.pluginMessage;
         if (message && requests.has(message.type)) {
@@ -81,7 +81,7 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
           { id: `${id}-text-${index}`, name: 'Body', type: 'TEXT', visible: true, characters: `Body ${index + 1} from ${name}`, absoluteRenderBounds: { x: 30, y: index * 600 + 40, width: 230, height: 30 } },
           { id: `${id}-cta-${index}`, name: 'CTA', type: 'TEXT', visible: true, characters: `Shop ${name} ${index + 1}`, absoluteRenderBounds: { x: 30, y: index * 600 + 100, width: 230, height: 30 } }
         ]).flat(),
-        async exportAsync() { if (id === 'frame-B' && previewGate) await previewGate; return Uint8Array.from(images[id]); },
+        async exportAsync() { if (id === previewGateForId && previewGate) await previewGate; return Uint8Array.from(images[id]); },
         clone() { cloneSources.push(id); return { id: `${id}-clone`, type: 'FRAME', x: 0, y: 0, removed: false }; }
       };
       Object.defineProperty(value, 'locked', { get() { return false; }, set() { layerLockWrites++; throw new Error('Plugin must not lock Figma layers'); } });
@@ -91,7 +91,7 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
     }
     const frameA = frame('frame-A', 'Frame A', 8400), frameB = frame('frame-B', 'Frame B', 3000);
     canvasSelection = [frameA];
-    let delivery = Promise.resolve(), exportGate = null, previewGate = null;
+    let delivery = Promise.resolve(), exportGate = null, previewGate = null, previewGateForId = 'frame-B';
     const figma = {
       currentPage: figmaPage,
       showUI(actualHtml, options) { assert.equal(actualHtml, html); assert.equal(options.width, 1100); },
@@ -137,8 +137,8 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
       for (const handler of events.get('selectionchange') || []) await handler();
       await pump();
     };
-    const changeDocument = async type => {
-      for (const handler of nodeEvents.get('nodechange') || []) await handler({ nodeChanges: [{ type, id: frameB.id, node: frameB }] });
+    const changeDocument = async (type, target = frameB, properties = []) => {
+      for (const handler of nodeEvents.get('nodechange') || []) await handler({ nodeChanges: [{ type, id: target.id, node: target, properties }] });
       await pump();
     };
     const business = () => page.evaluate(() => ({
@@ -180,6 +180,12 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
     await page.locator('.alt-final').fill('Keep this edited alt text on Frame A, slice eight.');
     await page.locator('.slice-link-panel input').fill('https://example.test/frame-a/slice-8');
     await next().click(); await previous().click(); await waitLocated();
+    const beforeRename = await business();
+    frameA.name = 'Frame A renamed';
+    await changeDocument('PROPERTY_CHANGE', frameA, ['name']);
+    await page.waitForFunction(() => document.getElementById('frameName').textContent === 'Frame A renamed');
+    beforeRename.frame.name = frameA.name;
+    assert.deepEqual(await business(), beforeRename, 'Renaming updates only metadata, never preview geometry or editing state');
     const editedA = await business(), previewA = await page.locator('#preview').getAttribute('src');
     await screenshot('locked-frame');
     const readyCount = outbound.filter(message => message.type === 'FRAME_READY').length;
@@ -232,6 +238,23 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
     assert.equal(outbound.filter(message => message.type === 'FRAME_SWITCH_REQUEST').length, proposalsBeforeUnlock, 'Unlock alone must not consume a pre-existing canvas selection');
     assert.deepEqual(await business(), beforeUnlock);
     await selectCanvas([frameB]);
+    await selectCanvas([frameB.children[0]]);
+    assert.equal(outbound.filter(message => message.type === 'FRAME_SWITCH_REQUEST').length, proposalsBeforeUnlock, 'Even unlocked, canvas clicks must not propose a switch');
+    assert.deepEqual(await business(), beforeUnlock);
+    await page.locator('#refreshBtn').click(); await pump(); await waitFrame(frameA.id); await settle();
+    assert.deepEqual(await business(), beforeUnlock, 'Refresh also keeps the working frame when unlocked');
+    let releaseSameFramePreview;
+    previewGateForId = frameA.id;
+    previewGate = new Promise(resolve => { releaseSameFramePreview = resolve; });
+    await selectCanvas([frameA]);
+    await page.locator('#useSelectedFrameBtn').click();
+    await page.waitForFunction(() => Boolean(frameSelectionIntent));
+    assert(await page.locator('#refreshBtn').isDisabled(), 'Refresh cannot cancel a pending explicit same-frame preview and strand its intent');
+    releaseSameFramePreview(); previewGate = null; previewGateForId = frameB.id;
+    await pump(); await page.waitForFunction(() => !frameSelectionIntent && !document.getElementById('useSelectedFrameBtn').disabled);
+    assert.deepEqual(await business(), beforeUnlock);
+    await selectCanvas([frameB]);
+    await page.locator('#useSelectedFrameBtn').click();
     await page.locator('#frameSwitchDialog').waitFor({ state: 'visible' });
     assert.match(await page.locator('#frameSwitchDialog').textContent(), /Frame B/);
     await screenshot('confirm-switch', '#frameSwitchDialog');
@@ -239,11 +262,13 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
     assert(!(await page.locator('#frameSwitchDialog').isVisible()));
     assert.deepEqual(await business(), beforeUnlock, 'Cancel keeps Frame A and all edits');
     await selectCanvas([frameB]);
+    await page.locator('#useSelectedFrameBtn').click();
     await page.locator('#frameSwitchDialog').waitFor({ state: 'visible' });
     await page.keyboard.press('Escape'); await pump();
     assert(!(await page.locator('#frameSwitchDialog').isVisible()));
     assert.deepEqual(await business(), beforeUnlock, 'Escape cancels a switch without clearing work');
     await selectCanvas([frameB]);
+    await page.locator('#useSelectedFrameBtn').click();
     await page.locator('#frameSwitchDialog').waitFor({ state: 'visible' });
     let releasePreview;
     previewGate = new Promise(resolve => { releasePreview = resolve; });
@@ -310,10 +335,12 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
     await page.locator('#frameLockBtn').click(); await pump();
     await page.waitForFunction(() => document.getElementById('frameLockBtn').getAttribute('aria-pressed') === 'false');
     await selectCanvas([frameA]);
+    await page.locator('#useSelectedFrameBtn').click();
     await page.locator('#frameSwitchDialog').waitFor({ state: 'visible' });
     await page.locator('#cancelFrameSwitch').click(); await pump();
     assert.deepEqual(await business(), editedB, 'Canceling replacement of a deleted frame also keeps its edits');
     await selectCanvas([frameA]);
+    await page.locator('#useSelectedFrameBtn').click();
     await page.locator('#frameSwitchDialog').waitFor({ state: 'visible' });
     await page.locator('#confirmFrameSwitch').click(); await pump(); await waitFrame(frameA.id);
     assert.equal(await page.evaluate(() => state.frameMissing), false);
@@ -322,7 +349,9 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
     frameB.removed = false;
     await page.locator('#frameLockBtn').click(); await pump();
     await page.waitForFunction(() => !state.frameLocked);
-    await selectCanvas([frameB]); await waitFrame(frameB.id); await settle();
+    await selectCanvas([frameB]);
+    assert.equal(await page.evaluate(() => state.frame.id), frameA.id, 'A clean unlocked frame also waits for an explicit plugin action');
+    await page.locator('#useSelectedFrameBtn').click(); await waitFrame(frameB.id); await settle();
     assert(!(await page.locator('#frameSwitchDialog').isVisible()));
     assert.equal(await page.evaluate(() => state.frameLocked), true);
     await page.setViewportSize({ width: 360, height: 640 }); await settle();

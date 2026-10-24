@@ -57,6 +57,7 @@ function resizeUi(width, height) {
 let workingFrameId = null;
 let workingFrameLocked = false;
 let workingFrameMissing = false;
+let workingFrameRevision = 0;
 let frameRequestVersion = 0;
 let nextSwitchRequestId = 0;
 let pendingFrameSwitch = null;
@@ -133,7 +134,8 @@ function postWorkingFrameState() {
         type: 'WORKING_FRAME_LOCK_STATE',
         frameId: workingFrameId,
         locked: workingFrameLocked,
-        missing: workingFrameMissing
+        missing: workingFrameMissing,
+        revision: workingFrameRevision
     });
 }
 function cancelFrameSwitch() {
@@ -173,6 +175,15 @@ function workingPageChanged(event) {
     if (event.nodeChanges.some(change => change.type === 'DELETE' || change.type === 'CREATE')) {
         void validateWorkingFrame();
     }
+    if (event.nodeChanges.some(change => change.type === 'PROPERTY_CHANGE' && change.id === workingFrameId && change.properties.includes('name'))) {
+        void publishWorkingFrameMetadata();
+    }
+}
+async function publishWorkingFrameMetadata() {
+    const node = await validateWorkingFrame();
+    if (node && node.id === workingFrameId) {
+        figma.ui.postMessage({ type: 'WORKING_FRAME_METADATA', frameId: node.id, name: node.name, revision: workingFrameRevision });
+    }
 }
 async function validateWorkingFrame() {
     const id = workingFrameId;
@@ -199,7 +210,7 @@ async function validateWorkingFrame() {
         return null;
     }
 }
-async function loadWorkingFrame(frameId, preserveEdits, switchConfirmed = false) {
+async function loadWorkingFrame(frameId, preserveEdits, switchConfirmed = false, selectionRequestId, requestId) {
     const version = ++frameRequestVersion;
     const oldId = workingFrameId;
     const oldLocked = workingFrameLocked;
@@ -210,21 +221,33 @@ async function loadWorkingFrame(frameId, preserveEdits, switchConfirmed = false)
         if (!frame || frame.removed || frame.type === 'DOCUMENT' || frame.type === 'PAGE' || !isFrameLike(frame)) {
             if (frameId === workingFrameId)
                 markWorkingFrameMissing();
-            else
-                figma.ui.postMessage({ type: oldId ? 'WORKING_FRAME_SELECTION_NOTICE' : 'SELECTION_ERROR', message: 'The chosen frame no longer exists. Your current work is preserved.' });
+            figma.ui.postMessage({ type: oldId ? 'WORKING_FRAME_SELECTION_NOTICE' : 'SELECTION_ERROR', selectionRequestId, message: 'The chosen frame no longer exists. Your current work is preserved.' });
             return;
         }
         const preview = await frame.exportAsync({
             format: 'PNG',
             constraint: { type: 'WIDTH', value: Math.min(900, Math.max(300, frame.width)) }
         });
-        if (version !== frameRequestVersion || frame.removed)
+        if (version !== frameRequestVersion)
+            return;
+        if (frame.removed) {
+            if (frameId === workingFrameId)
+                markWorkingFrameMissing();
+            figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', selectionRequestId, message: 'The chosen frame was deleted while loading. Your current work is preserved.' });
+            return;
+        }
+        if (oldId !== workingFrameId)
+            return;
+        const pending = pendingFrameSwitch;
+        if (oldId && oldId !== frame.id && (!switchConfirmed || workingFrameLocked || !pending ||
+            pending.requestId !== requestId || pending.selectionRequestId !== selectionRequestId || pending.frameId !== frame.id))
             return;
         const layerBounds = collectLayerBounds(frame);
         const textItems = collectTextItems(frame);
         workingFrameId = frame.id;
         workingFrameLocked = preserveEdits && oldId === frame.id ? oldLocked : true;
         workingFrameMissing = false;
+        workingFrameRevision += 1;
         pendingFrameSwitch = null;
         watchWorkingPage(frame);
         figma.ui.postMessage({
@@ -233,7 +256,7 @@ async function loadWorkingFrame(frameId, preserveEdits, switchConfirmed = false)
             layerBounds, textItems, preview,
             locked: workingFrameLocked,
             preserveEdits: preserveEdits && oldId === frame.id,
-            switchConfirmed
+            switchConfirmed, requestId, selectionRequestId, fromFrameId: oldId, revision: workingFrameRevision
         });
         postWorkingFrameState();
     }
@@ -242,49 +265,59 @@ async function loadWorkingFrame(frameId, preserveEdits, switchConfirmed = false)
             return;
         figma.ui.postMessage({
             type: workingFrameId ? 'WORKING_FRAME_SELECTION_NOTICE' : 'SELECTION_ERROR',
+            selectionRequestId,
             message: error instanceof Error ? error.message : 'Could not render the selected frame.'
         });
     }
 }
-async function sendSelection(explicitRefresh = false) {
+// This read occurs once at startup. Later selection events never acquire a frame.
+async function initializeWorkingFrame() {
+    const selection = figma.currentPage.selection;
+    if (selection.length !== 1 || !isFrameLike(selection[0])) {
+        figma.ui.postMessage({ type: 'SELECTION_ERROR', message: 'Select an email frame in Figma, then click Use selected frame.' });
+        return;
+    }
+    await loadWorkingFrame(selection[0].id, false);
+}
+async function handleCanvasSelectionChange() {
+    // Browsing the canvas cannot cancel, propose, confirm or load a working frame.
+    if (workingFrameId)
+        await validateWorkingFrame();
+}
+async function refreshWorkingFrame() {
+    cancelFrameSwitch();
+    if (workingFrameId)
+        await loadWorkingFrame(workingFrameId, true);
+    else
+        figma.ui.postMessage({ type: 'SELECTION_ERROR', message: 'Select an email frame in Figma, then click Use selected frame.' });
+}
+async function useCanvasSelection(message) {
+    if (!Number.isSafeInteger(message.selectionRequestId) || message.selectionRequestId <= 0 || message.frameId !== workingFrameId)
+        return;
+    const selectionRequestId = message.selectionRequestId;
     if (workingFrameId && workingFrameLocked) {
-        if (explicitRefresh)
-            await loadWorkingFrame(workingFrameId, true);
-        else
-            await validateWorkingFrame();
+        figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', selectionRequestId, message: 'Unlock the working frame before using another canvas selection.' });
+        return;
+    }
+    if (exportInProgress) {
+        figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', selectionRequestId, message: 'Wait for image export to finish before switching frames. Your current work is unchanged.' });
         return;
     }
     const selection = figma.currentPage.selection;
     if (selection.length !== 1 || !isFrameLike(selection[0])) {
-        cancelFrameSwitch();
-        if (!workingFrameId)
-            figma.ui.postMessage({ type: 'SELECTION_ERROR', message: 'Select exactly one email frame, component, or instance.' });
-        else
-            figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', message: 'Select one frame, component, or instance to switch. Your current working frame and edits are unchanged.' });
+        figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', selectionRequestId, message: 'Select one frame, component or instance, then click Use selected frame. Your work is unchanged.' });
         return;
     }
     const frame = selection[0];
-    if (!workingFrameId) {
-        await loadWorkingFrame(frame.id, false);
-        return;
-    }
-    if (frame.id === workingFrameId) {
-        cancelFrameSwitch();
-        if (explicitRefresh)
-            await loadWorkingFrame(frame.id, true);
-        else
-            await validateWorkingFrame();
-        return;
-    }
-    if (exportInProgress) {
-        figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', message: 'Wait for image export to finish before switching frames. Your current work is unchanged.' });
-        return;
-    }
     cancelFrameSwitch();
-    pendingFrameSwitch = { requestId: ++nextSwitchRequestId, frameId: frame.id, fromFrameId: workingFrameId };
+    if (!workingFrameId || frame.id === workingFrameId) {
+        await loadWorkingFrame(frame.id, Boolean(workingFrameId), false, selectionRequestId);
+        return;
+    }
+    pendingFrameSwitch = { requestId: ++nextSwitchRequestId, frameId: frame.id, fromFrameId: workingFrameId, selectionRequestId };
     figma.ui.postMessage({
         type: 'FRAME_SWITCH_REQUEST', requestId: pendingFrameSwitch.requestId, fromFrameId: workingFrameId,
-        frame: { id: frame.id, name: frame.name, width: frame.width, height: frame.height }
+        selectionRequestId, frame: { id: frame.id, name: frame.name, width: frame.width, height: frame.height }
     });
 }
 function setWorkingFrameLock(message) {
@@ -299,13 +332,13 @@ async function decideFrameSwitch(message) {
     const pending = pendingFrameSwitch;
     if (!pending || message.requestId !== pending.requestId)
         return;
-    if (!message.accept || workingFrameLocked || workingFrameId !== pending.fromFrameId || exportInProgress) {
+    if (message.accept !== true || workingFrameLocked || workingFrameId !== pending.fromFrameId || exportInProgress) {
         cancelFrameSwitch();
         if (exportInProgress)
             figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', message: 'Wait for image export to finish before switching frames.' });
         return;
     }
-    await loadWorkingFrame(pending.frameId, false, true);
+    await loadWorkingFrame(pending.frameId, false, true, pending.selectionRequestId, pending.requestId);
 }
 function normaliseCuts(values, max) {
     return [...new Set(values.map(value => Math.round(value * 100) / 100))]
@@ -441,12 +474,14 @@ figma.ui.onmessage = async (message) => {
         setWorkingFrameLock(message);
     if (message.type === 'FRAME_SWITCH_DECISION')
         await decideFrameSwitch(message);
+    if (message.type === 'USE_CANVAS_SELECTION')
+        await useCanvasSelection(message);
     if (message.type === 'REFRESH_SELECTION')
-        await sendSelection(true);
+        await refreshWorkingFrame();
     if (message.type === 'EXPORT')
         await exportRegions(message);
     if (message.type === 'CLOSE')
         figma.closePlugin();
 };
-figma.on('selectionchange', () => { void sendSelection(); });
-void sendSelection();
+figma.on('selectionchange', () => { void handleCanvasSelectionChange(); });
+void initializeWorkingFrame();

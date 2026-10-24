@@ -10,7 +10,7 @@ The opening window is now **1100 × 840**, so the two-panel design and divider a
 
 ## Existing workflow
 
-1. Select one email frame, component, or instance in Figma. It automatically becomes the **locked working frame**: selecting or copying from other canvas layers does not change the preview or edits. **Unlock** alone keeps the current work; select another frame (or use Refresh on an already selected frame) to switch intentionally. If switching would discard work, confirm **Switch frame** or choose **Keep current frame**. A new working frame locks automatically. While locked, Refresh updates that same frame by ID and preserves edits. This control never locks actual Figma layers or changes canvas selection.
+1. A valid frame selected when the plugin opens becomes the **locked working frame**. Selecting or copying from other canvas layers never changes the preview or edits, even after unlocking. To switch: **Unlock → select the desired frame in Figma → click Use selected frame inside Step 1**. Confirm **Switch frame** if work would be discarded, or choose **Keep current frame**. A new working frame locks automatically. **Refresh always updates the current working frame by ID**, whether locked or unlocked; it never adopts the canvas selection. If no frame was available at startup, select one and click **Use selected frame** in the empty-state view. No actual Figma layer is locked and canvas selection is never forced.
 2. Use Horizontal mode to add rows, then split a row into 2 columns, 3 columns, or custom columns. Click guides to remove them; Undo and Reset retain their existing behavior. Numbered preview labels open that slice's content review.
 3. Review text inclusion, the optional CTA, final alt text, and each slice's destination URL. Next/Previous, slice chips and the jump selector locate the active slice in the email preview. Click the **Slice N of M** indicator to locate it again without changing any edits. Fitting slices are centered; tall slices align near the top. Only the preview scrolls, using smooth motion unless reduced motion is enabled. Select All, Clear, text Copy, default URL, and “No CTA divider” remain available. Expand **Slice preview & location** for the original crop and email map.
 4. Choose a Klaviyo account with the searchable dropdown. Search appears inside the panel only, resets on opening, and uses the already loaded account list. Refresh retains a still-valid selected account ID. Advanced settings retain the backend URL/token, automatic export scale, and JPEG ZIP download.
@@ -52,6 +52,7 @@ node tests/redesign-workflow.cjs
 node tests/active-slice-scroll.cjs
 node tests/working-frame-controller.cjs
 node tests/working-frame-lock.cjs
+node tests/working-frame-authority.cjs
 node tests/ui-preferences.cjs
 ```
 

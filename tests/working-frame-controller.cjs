@@ -64,7 +64,7 @@ function createHost(initial = ['A']) {
   return {
     messages, nodes, clones, crops, reads, writes, pageEvents, page, context,
     async select(...ids) { selected = ids.map(id => nodes.get(id)); events.get('selectionchange')(); await idle(); },
-    async pageChange(type = 'DELETE', id = 'A') { for (const callback of [...pageEvents]) callback({ nodeChanges: [{ type, id }] }); await idle(); },
+    async pageChange(type = 'DELETE', id = 'A', properties = ['name']) { for (const callback of [...pageEvents]) callback({ nodeChanges: [{ type, id, node: nodes.get(id), properties }] }); await idle(); },
     send: message => figma.ui.onmessage(message),
     get selection() { return selected; },
     get selectionWrites() { return selectionWrites; },
@@ -78,11 +78,18 @@ function createHost(initial = ['A']) {
 
 const exportRequest = (workingFrameId = 'A') => ({ type: 'EXPORT', workingFrameId, horizontalCuts: [400, 800], verticalCutsBySection: { '0': [300] }, excludeAfterLastCut: true, scale: 2 });
 const unlock = host => host.send({ type: 'SET_WORKING_FRAME_LOCK', frameId: host.state().workingFrameId, locked: false });
+let nextSelectionRequestId = 0;
+const useCanvas = host => host.send({ type: 'USE_CANVAS_SELECTION', frameId: host.state().workingFrameId, selectionRequestId: ++nextSelectionRequestId });
+const choose = async (host, ...ids) => {
+  await host.select(...ids);
+  await useCanvas(host);
+};
 
 (async () => {
   const host = createHost(); await idle();
   assert.equal(host.last('FRAME_READY').frame.id, 'A');
   assert.equal(host.last('FRAME_READY').locked, true);
+  assert(Number.isSafeInteger(host.last('FRAME_READY').revision) && host.last('FRAME_READY').revision > 0, 'Working-frame publications carry a monotonically identifiable revision');
   assert.equal(host.state().workingFrameId, 'A');
   const initialMessages = host.count('FRAME_READY');
   const initialErrors = host.count('SELECTION_ERROR');
@@ -101,15 +108,43 @@ const unlock = host => host.send({ type: 'SET_WORKING_FRAME_LOCK', frameId: host
   assert.deepEqual(host.selection.map(node => node.id), ['B'], 'Export must not move canvas selection back to A');
   assert.equal(host.selectionWrites, 0);
   assert.equal(host.actualLayerLockWrites, 0);
+  await useCanvas(host);
+  assert.equal(host.count('FRAME_SWITCH_REQUEST'), 0, 'Explicit replacement still requires unlocking the current frame first');
+
+  host.nodes.get('A').name = 'Renamed working frame';
+  await host.pageChange('PROPERTY_CHANGE', 'A');
+  assert.equal(host.last('WORKING_FRAME_METADATA').frameId, 'A');
+  assert.equal(host.last('WORKING_FRAME_METADATA').name, 'Renamed working frame');
+  assert.equal(host.state().workingFrameId, 'A', 'Renaming changes metadata, never working identity');
+  assert.equal(host.count('FRAME_READY'), initialMessages, 'Renaming must not reload the preview or reset review state');
 
   await unlock(host);
   assert.equal(host.state().workingFrameLocked, false);
   assert.equal(host.state().workingFrameId, 'A', 'Unlock alone must not adopt already-selected B');
   assert.equal(host.count('FRAME_SWITCH_REQUEST'), 0, 'Unlock does not propose an implicit switch');
   assert.equal(host.count('FRAME_READY'), initialMessages);
+  const proposalsBeforeBrowsing = host.count('FRAME_SWITCH_REQUEST');
+  await host.select('B');
+  await host.select('text-B');
+  assert.equal(host.count('FRAME_SWITCH_REQUEST'), proposalsBeforeBrowsing, 'Browsing canvas nodes while unlocked must not start a frame switch');
+  assert.equal(host.count('FRAME_READY'), initialMessages, 'Canvas browsing cannot publish a new working preview');
+  assert.equal(host.state().workingFrameId, 'A');
+  await host.select('B');
+  for (const selectionRequestId of [undefined, 0, -1, 1.5, '1']) {
+    await host.send({ type: 'USE_CANVAS_SELECTION', frameId: 'A', selectionRequestId });
+  }
+  await host.send({ type: 'USE_CANVAS_SELECTION', frameId: 'stale-frame', selectionRequestId: ++nextSelectionRequestId });
+  assert.equal(host.count('FRAME_SWITCH_REQUEST'), proposalsBeforeBrowsing, 'Invalid or stale UI intents cannot start replacement of the working frame');
+  assert.equal(host.state().workingFrameId, 'A');
+  await host.select('text-B');
   await host.send({ type: 'REFRESH_SELECTION' });
+  assert.equal(host.last('FRAME_READY').frame.id, 'A', 'Refresh always reloads the working ID, even when unlocked and B text is selected');
+  assert.equal(host.last('FRAME_READY').preserveEdits, true);
+  assert.equal(host.count('FRAME_SWITCH_REQUEST'), proposalsBeforeBrowsing);
+  await choose(host, 'B');
   const canceled = host.last('FRAME_SWITCH_REQUEST');
   assert.equal(canceled.frame.id, 'B');
+  assert.equal(canceled.selectionRequestId, nextSelectionRequestId, 'Proposal echoes the explicit plugin-selection intent');
   await host.send({ type: 'FRAME_SWITCH_DECISION', requestId: canceled.requestId, accept: false });
   assert.equal(host.state().workingFrameId, 'A');
   assert.equal(host.state().workingFrameLocked, false);
@@ -117,9 +152,9 @@ const unlock = host => host.send({ type: 'SET_WORKING_FRAME_LOCK', frameId: host
   await host.send({ type: 'FRAME_SWITCH_DECISION', requestId: canceled.requestId, accept: true });
   assert.equal(host.state().workingFrameId, 'A', 'Canceled requests cannot be accepted later');
 
-  await host.select('B');
+  await choose(host, 'B');
   const oldRequest = host.last('FRAME_SWITCH_REQUEST');
-  await host.select('C');
+  await choose(host, 'C');
   const newRequest = host.last('FRAME_SWITCH_REQUEST');
   await host.send({ type: 'FRAME_SWITCH_DECISION', requestId: oldRequest.requestId, accept: true });
   assert.equal(host.state().workingFrameId, 'A', 'A stale request cannot replace the working frame');
@@ -128,6 +163,7 @@ const unlock = host => host.send({ type: 'SET_WORKING_FRAME_LOCK', frameId: host
   assert.equal(host.state().workingFrameLocked, true, 'Intentionally chosen frames lock automatically');
   assert.equal(host.last('FRAME_READY').switchConfirmed, true);
   assert.equal(host.last('FRAME_READY').preserveEdits, false);
+  assert.equal(host.last('FRAME_READY').selectionRequestId, newRequest.selectionRequestId, 'Committed preview stays bound to the accepted intent');
 
   const countBeforeRefresh = host.count('FRAME_READY');
   await host.select('B');
@@ -141,6 +177,15 @@ const unlock = host => host.send({ type: 'SET_WORKING_FRAME_LOCK', frameId: host
   await host.send({ type: 'REFRESH_SELECTION' });
   assert.equal(host.last('FRAME_READY').locked, false, 'Refreshing the same frame retains unlocked mode');
   assert.equal(host.last('FRAME_READY').preserveEdits, true);
+
+  // An explicit target is a stable snapshot, not a live canvas-selection binding.
+  const sticky = createHost(); await idle(); await unlock(sticky); await choose(sticky, 'B');
+  const stickyRequest = sticky.last('FRAME_SWITCH_REQUEST');
+  const cancellationsBeforeBrowsing = sticky.count('FRAME_SWITCH_CANCELED');
+  await sticky.select('C'); await sticky.select('text-B');
+  assert.equal(sticky.count('FRAME_SWITCH_CANCELED'), cancellationsBeforeBrowsing, 'Canvas browsing cannot cancel an explicit plugin choice');
+  await sticky.send({ type: 'FRAME_SWITCH_DECISION', requestId: stickyRequest.requestId, accept: true });
+  assert.equal(sticky.state().workingFrameId, 'B', 'Confirm commits the explicitly chosen ID even if canvas selection changes afterward');
 
   // Deleting the frame or an ancestor retains identity and notifies without fallback.
   const deleted = createHost(); await idle();
@@ -164,16 +209,25 @@ const unlock = host => host.send({ type: 'SET_WORKING_FRAME_LOCK', frameId: host
   assert.equal(deleted.last('FRAME_READY').preserveEdits, true);
 
   // Canceled/locked/failed renders must never commit late over newer choices.
-  const racing = createHost(); await idle(); await unlock(racing); await racing.select('B');
+  const missingUse = createHost(); await idle(); await unlock(missingUse);
+  missingUse.nodes.get('A').removed = true;
+  await useCanvas(missingUse);
+  assert.equal(missingUse.last('WORKING_FRAME_SELECTION_NOTICE').selectionRequestId, nextSelectionRequestId, 'An unavailable explicit choice releases its matching UI intent');
+  assert.equal(missingUse.state().workingFrameLocked, false, 'A failed same-frame choice must not silently relock or replace work');
+  assert.equal(missingUse.state().workingFrameId, 'A');
+
+  const racing = createHost(); await idle(); await unlock(racing); await choose(racing, 'B');
   const held = deferred(); racing.setRender(id => id === 'B' ? held.promise : Promise.resolve(new Uint8Array([4])));
   const loadingB = racing.send({ type: 'FRAME_SWITCH_DECISION', requestId: racing.last('FRAME_SWITCH_REQUEST').requestId, accept: true });
   await idle();
   await racing.select('C');
+  assert.equal(racing.last('FRAME_SWITCH_REQUEST').frame.id, 'B', 'Canvas browsing cannot replace a pending explicit switch target');
+  await useCanvas(racing);
   await racing.send({ type: 'FRAME_SWITCH_DECISION', requestId: racing.last('FRAME_SWITCH_REQUEST').requestId, accept: true });
   held.resolve(new Uint8Array([2])); await loadingB;
   assert.equal(racing.state().workingFrameId, 'C');
   assert.deepEqual(racing.messages.filter(message => message.type === 'FRAME_READY').map(message => message.frame.id), ['A', 'C']);
-  await unlock(racing); await racing.select('B');
+  await unlock(racing); await choose(racing, 'B');
   const heldAgain = deferred(); racing.setRender(() => heldAgain.promise);
   const lateB = racing.send({ type: 'FRAME_SWITCH_DECISION', requestId: racing.last('FRAME_SWITCH_REQUEST').requestId, accept: true });
   await idle();
@@ -181,20 +235,24 @@ const unlock = host => host.send({ type: 'SET_WORKING_FRAME_LOCK', frameId: host
   heldAgain.resolve(new Uint8Array([2])); await lateB;
   assert.equal(racing.state().workingFrameId, 'C');
   assert.equal(racing.state().workingFrameLocked, true);
-  await unlock(racing); await racing.select('B'); racing.setRender(async () => { throw Error('Fixture render failure'); });
+  await unlock(racing); await choose(racing, 'B'); racing.setRender(async () => { throw Error('Fixture render failure'); });
   await racing.send({ type: 'FRAME_SWITCH_DECISION', requestId: racing.last('FRAME_SWITCH_REQUEST').requestId, accept: true });
   assert.equal(racing.state().workingFrameId, 'C');
   assert.match(racing.last('WORKING_FRAME_SELECTION_NOTICE').message, /Fixture render failure/);
 
   const initialRace = createHost([]); await idle();
-  const initialHeld = deferred(); initialRace.setRender(id => id === 'A' ? initialHeld.promise : Promise.resolve(new Uint8Array([3])));
   await initialRace.select('A'); await initialRace.select('B');
-  initialHeld.resolve(new Uint8Array([1])); await idle();
+  assert.equal(initialRace.state().workingFrameId, null, 'After startup, native selection changes cannot initialize the editor implicitly');
+  assert.equal(initialRace.count('FRAME_READY'), 0);
+  const initialHeld = deferred(); initialRace.setRender(id => id === 'A' ? initialHeld.promise : Promise.resolve(new Uint8Array([3])));
+  const initialA = choose(initialRace, 'A'); await idle();
+  await choose(initialRace, 'B');
+  initialHeld.resolve(new Uint8Array([1])); await initialA; await idle();
   assert.equal(initialRace.state().workingFrameId, 'B');
   assert.deepEqual(initialRace.messages.filter(message => message.type === 'FRAME_READY').map(message => message.frame.id), ['B']);
 
   // Export and preferences keep their contracts while stable IDs guard work.
-  const busy = createHost(); await idle(); await unlock(busy); await busy.select('B');
+  const busy = createHost(); await idle(); await unlock(busy); await choose(busy, 'B');
   const cropHeld = deferred(); busy.setCropExport(() => cropHeld.promise);
   const exporting = busy.send(exportRequest()); await idle();
   assert.equal(busy.state().exportInProgress, true);
