@@ -1,5 +1,6 @@
 "use strict";
-figma.showUI(__html__, { width: 700, height: 840, themeColors: true });
+// Open above the 840 px split-layout breakpoint so v12 is visible on launch.
+figma.showUI(__html__, { width: 1100, height: 840, themeColors: true });
 const TARGET_EMAIL_EXPORT_WIDTH = 1200;
 const UI_PREFERENCES_KEY = 'inbox-slicer:ui:v12';
 const DEFAULT_PANEL_RATIO = 0.38;

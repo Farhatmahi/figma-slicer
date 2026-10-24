@@ -1,4 +1,5 @@
-figma.showUI(__html__, { width: 700, height: 840, themeColors: true });
+// Open above the 840 px split-layout breakpoint so v12 is visible on launch.
+figma.showUI(__html__, { width: 1100, height: 840, themeColors: true });
 
 type Region = {
   id: string;

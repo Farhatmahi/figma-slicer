@@ -3,17 +3,30 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
 const ui = fs.readFileSync(path.join(root, manifest.ui), 'utf8');
 assert.equal(ui, fs.readFileSync(path.join(root, 'src/ui.html'), 'utf8'), 'Rebuild the manifest UI before testing');
+let launchOptions;
+vm.runInNewContext(fs.readFileSync(path.join(root, manifest.main), 'utf8'), {
+  __html__: ui,
+  figma: {
+    showUI(html, options) {
+      assert.equal(html, ui, 'Controller opens the exact UI selected by the manifest');
+      launchOptions = options;
+    },
+    currentPage: { selection: [] }, ui: { postMessage() {} }, on() {}
+  }
+});
+assert(launchOptions && launchOptions.width >= 840, 'Actual controller launch must expose the v12 two-panel workspace');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
   try {
-    const page = await browser.newPage({ viewport: { width: 1100, height: 840 }, acceptDownloads: true });
+    const page = await browser.newPage({ viewport: { width: launchOptions.width, height: launchOptions.height }, acceptDownloads: true });
     page.setDefaultTimeout(7000);
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -144,6 +157,9 @@ assert.equal(ui, fs.readFileSync(path.join(root, 'src/ui.html'), 'utf8'), 'Rebui
       return { preview: { x: preview.x, y: preview.y, right: preview.right }, workflow: { x: workflow.x, y: workflow.y } };
     });
     assert(initialPanels.preview.right <= initialPanels.workflow.x, 'Wide view has side-by-side preview and workflow');
+    assert(await page.locator('#panelDivider').isVisible(), 'Divider is visible at the actual Figma launch size');
+    assert(await page.locator('#pluginVersion').isVisible(), 'The running UI identifies itself as v12');
+    assert.equal(await page.locator('#pluginVersion').textContent(), 'v12.0');
     assert.equal(await page.evaluate(() => state.zoom), 0.5, 'Frame selection retains the existing default zoom');
     await shot('wide-default');
 
@@ -255,6 +271,7 @@ assert.equal(ui, fs.readFileSync(path.join(root, 'src/ui.html'), 'utf8'), 'Rebui
         return { scrollWidth: document.documentElement.scrollWidth, innerWidth, workspaceScrollWidth: workspace.scrollWidth, workspaceWidth: workspace.clientWidth, previewBottom: preview.bottom, previewRight: preview.right, workflowTop: workflow.top, workflowLeft: workflow.left };
       });
       assert(layout.scrollWidth <= layout.innerWidth + 1, `No horizontal document overflow at ${width}×${height}`);
+      assert(await page.locator('#pluginVersion').isVisible(), 'Running UI version remains discoverable at every window width');
       assert(layout.workspaceScrollWidth <= layout.workspaceWidth + 1, `No horizontal workflow overflow at ${width}×${height}`);
       if (width < 840) assert(layout.previewBottom <= layout.workflowTop + 1, 'Narrow view stacks preview above controls');
       else assert(layout.previewRight <= layout.workflowLeft + 1, 'Usable widths retain two columns');

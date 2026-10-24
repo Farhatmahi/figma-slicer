@@ -1,10 +1,11 @@
 {
   "name": "inbox-slicer",
-  "version": "0.1.4",
+  "version": "12.0.0",
   "private": true,
   "scripts": {
     "build": "node build.mjs",
-    "watch": "node build.mjs --watch"
+    "watch": "node build.mjs --watch",
+    "verify:production": "node tests/production-build.cjs"
   },
   "devDependencies": {
     "@figma/plugin-typings": "latest",

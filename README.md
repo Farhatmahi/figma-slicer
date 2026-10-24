@@ -6,7 +6,7 @@ Internal Figma plugin for slicing email designs and creating native Klaviyo temp
 
 The light workspace pairs an interactive email preview with five sections on one scrollable page: Select Frame, Slice Layout, Review Content, Klaviyo Settings, and Create Template. At widths of 840 px and above, drag the divider or focus it and use the arrow keys to adjust the panels. Double-click it to restore the 38% preview proportion. The panel proportion is saved through Figma client storage; zoom and window size are not saved.
 
-The opening window remains 700 × 840. Use the header's **Switch to wide workspace** button for a 1100 px window, or drag the bottom-right window grip. The grip also supports arrow keys. Below 840 px, preview and controls stack vertically. Notifications occupy a reserved footer rather than covering controls.
+The opening window is now **1100 × 840**, so the two-panel design and divider appear on launch. The earlier 700 px opening width was below the 840 px split breakpoint and always opened the stacked layout. Use the header's **Switch to compact workspace** button for a 700 px window, or drag the bottom-right window grip. The grip also supports arrow keys. Below 840 px, preview and controls stack vertically. Notifications occupy a reserved footer rather than covering controls.
 
 ## Existing workflow
 
@@ -20,9 +20,12 @@ Existing session behavior and credential handling are unchanged. Only panel prop
 
 ## Install in Figma Desktop
 
-1. Download the repository ZIP and extract it to a new folder, or update your checkout.
-2. Open **Plugins > Development > Import plugin from manifest** and select that folder's `manifest.json`.
-3. Run **InboxImplementor Slicer** on an email frame. If an older build is still open, close it and reopen the newly imported development plugin.
+1. Close the currently running plugin. Download the new repository ZIP and extract it to a **new folder**, or pull the updated checkout.
+2. Open **Plugins > Development > Import plugin from manifest** and select the **root `manifest.json` in that new folder**. It sits beside `src` and `dist`; do not select a manifest in an older extracted folder.
+3. Select an email frame and run **Plugins > Development > InboxImplementor Slicer v12.0**. Avoid an older generic entry from Recents or Community.
+4. Confirm **v12.0** appears in the plugin header and the preview sits to the left of the five workflow sections. If the header still says v11.4, Figma is still loading the old installation. Re-import the new manifest rather than rerunning that old entry.
+
+GitHub pushes do **not** update files in an older extracted ZIP folder, change Figma's saved local manifest path, or publish a Community plugin update. See [the installation diagnosis](docs/v12-installation-diagnosis.md) for the verified cause and reload guidance.
 
 `manifest.json` loads `dist/code.js` and `dist/ui.html`. The production files are committed and already built; no local build is required to import the plugin.
 
@@ -33,6 +36,7 @@ Use Node.js with the existing npm toolchain:
 ```sh
 npm ci
 npm run build
+npm run verify:production
 npx --no-install tsc --noEmit
 ```
 
@@ -45,5 +49,7 @@ node tests/klaviyo-account-search.cjs
 node tests/redesign-workflow.cjs
 node tests/ui-preferences.cjs
 ```
+
+`verify:production` checks that both built entry points exactly match their sources, the Figma menu and UI identify v12.0, and the compiled controller opens above the split-layout breakpoint. The workflow browser test takes its initial viewport from the **actual built controller's `showUI` call**, rather than assuming a wide window.
 
 The browser tests load the actual manifest-referenced HTML and mock Figma host messages and backend responses. The controller tests exercise the built controller in a mock Figma host. These checks do not establish live Figma document export or live backend/Klaviyo access. See [the preservation audit](docs/functional-preservation.md) for coverage and known limitations.

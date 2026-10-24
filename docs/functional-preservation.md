@@ -108,7 +108,7 @@ Existing backend routes and payloads (optional bearer header continues to come o
 - `node tests/ui-preferences.cjs` — passed against the production controller: safe restore/default/error paths, serialized preference saves, ratio-only storage, window resize validation/clamping, and existing controller entry points.
 - Browser layouts checked at 1100 × 840, 900 × 650/700, 700 × 700/840, 360 × 500/640, and 1100 × 480. Both document and workflow horizontal overflow checks passed. All five sections remain reachable in the single workflow scroller. The preview has its intentional canvas scroller; account results scroll only inside their popup.
 - The panel ratio survives a mock-host reload; the frame preview restarts at the original 50% zoom. Controller storage tests assert no zoom, window size, document data, or credentials are saved.
-- All 51 baseline static control IDs remain, with no duplicate IDs. Existing message types, API paths/payloads, footer-exclusion default, 700 × 840 opening window, and 1200 px export rule are preserved.
+- All 51 baseline static control IDs remain, with no duplicate IDs. Existing message types, API paths/payloads, footer-exclusion default, and 1200 px export rule are preserved. A subsequent installation investigation corrected the initial window to 1100 × 840 so the two-panel workspace appears on launch; compact mode remains available.
 
 ### Visual evidence
 
@@ -126,3 +126,7 @@ The written light-theme specification guided the design. No reference image was 
 ### Unverified live behavior
 
 Figma Desktop was unavailable in this environment. Actual selection events from a live document, temporary-frame cloning/JPEG rendering, real Figma window dragging and clientStorage across desktop sessions, and live backend/Klaviyo uploads/template creation still require a desktop smoke test. Browser tests use real UI interactions with mock host messages/API responses; controller tests use a mock Figma API. No live template was created and no credentials were changed.
+
+### Installation follow-up
+
+The user reported seeing a v11.4-or-earlier header after v12 was pushed. The [installation diagnosis](v12-installation-diagnosis.md) records the source/build/remote evidence distinguishing the old running installation from the separate narrow startup defect. The development menu now identifies v12.0, its version badge remains visible when narrow, and `npm run verify:production` checks the complete manifest/source/build path. The workflow browser test derives its launch size from the compiled controller so a return to the too-narrow initial size fails validation.
