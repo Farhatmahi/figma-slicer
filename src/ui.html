@@ -230,7 +230,7 @@
 
     .account-picker { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-bottom: 8px; }
     .account-picker button { white-space: nowrap; }
-    .account-search { position: relative; margin-bottom: 6px; }
+    .account-search { position: relative; flex: none; }
     .account-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ii-muted); pointer-events: none; }
     .account-search #klaviyoAccountSearch { padding-left: 30px; }
     .account-select-trigger { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; font-weight: 400; }
@@ -239,10 +239,11 @@
     .account-dropdown { position: fixed; z-index: 50; padding: 8px; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--ii-border); border-radius: 8px; background: var(--figma-color-bg); color: var(--figma-color-text); box-shadow: 0 6px 20px rgba(0,0,0,.2); }
     .account-dropdown[hidden] { display: none; }
     .account-options { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
-    .account-option { padding: 9px; border-radius: 5px; cursor: pointer; overflow-wrap: anywhere; }
+    .account-option { position: relative; padding: 9px 9px 9px 29px; border-radius: 5px; cursor: pointer; overflow-wrap: anywhere; }
+    .account-option:hover { background: var(--ii-surface); }
     .account-option[aria-selected="true"] { font-weight: 700; }
     .account-option.active { background: var(--ii-surface); outline: 1px solid var(--ii-accent); outline-offset: -1px; }
-    .account-option[aria-selected="true"]::after { content: ' ✓'; color: var(--ii-accent); }
+    .account-option[aria-selected="true"]::before { content: '✓'; position: absolute; left: 9px; color: var(--ii-accent); }
     .account-no-results { padding: 9px; color: var(--ii-muted); }
     .account-select-trigger:focus-visible, #klaviyoAccountSearch:focus-visible { outline: 2px solid var(--ii-accent); outline-offset: 1px; }
     .account-status { min-height: 16px; margin-bottom: 10px; color: var(--ii-muted); line-height: 1.35; }
@@ -374,10 +375,6 @@
           <div class="account-picker">
             <div class="field">
               <span id="klaviyoAccountLabel">Klaviyo account</span>
-              <div class="account-search">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-                <input id="klaviyoAccountSearch" type="text" role="combobox" aria-label="Search Klaviyo accounts" aria-autocomplete="list" aria-expanded="false" aria-controls="klaviyoAccountOptions" placeholder="Search Klaviyo accounts..." autocomplete="off" spellcheck="false">
-              </div>
               <select id="klaviyoAccount" disabled hidden aria-hidden="true" tabindex="-1">
                 <option value="">Loading accounts…</option>
               </select>
@@ -385,6 +382,10 @@
                 <span id="klaviyoAccountValue" class="account-select-label">Loading accounts…</span>
               </button>
               <div id="klaviyoAccountDropdown" class="account-dropdown" hidden>
+                <div class="account-search">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+                  <input id="klaviyoAccountSearch" type="text" role="combobox" aria-label="Search Klaviyo accounts" aria-autocomplete="list" aria-expanded="false" aria-controls="klaviyoAccountOptions" placeholder="Search Klaviyo accounts..." autocomplete="off" spellcheck="false">
+                </div>
                 <div id="klaviyoAccountOptions" class="account-options" role="listbox" aria-labelledby="klaviyoAccountLabel"></div>
                 <div id="klaviyoAccountEmpty" class="account-no-results" role="status" hidden>No matching accounts found</div>
               </div>
@@ -828,15 +829,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     function position() {
       if (dropdown.hidden) return;
       const rect = trigger.getBoundingClientRect();
-      const searchRect = search.getBoundingClientRect();
       const below = window.innerHeight - rect.bottom - 8;
-      const above = searchRect.top - 8;
+      const above = rect.top - 8;
       const openAbove = below < 240 && above > below;
       dropdown.style.width = `${Math.min(rect.width, window.innerWidth - 16)}px`;
       dropdown.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - dropdown.offsetWidth - 8))}px`;
       dropdown.style.maxHeight = `${Math.max(0, Math.min(300, openAbove ? above : below))}px`;
       dropdown.style.top = openAbove ? 'auto' : `${rect.bottom + 4}px`;
-      dropdown.style.bottom = openAbove ? `${window.innerHeight - searchRect.top + 4}px` : 'auto';
+      dropdown.style.bottom = openAbove ? `${window.innerHeight - rect.top + 4}px` : 'auto';
     }
 
     function activate(index) {
@@ -893,6 +893,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     function open() {
       if (select.disabled) return;
+      search.value = '';
       dropdown.hidden = false;
       trigger.setAttribute('aria-expanded', 'true');
       search.setAttribute('aria-expanded', 'true');
@@ -914,33 +915,29 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         if (event.key === 'ArrowUp' && activeIndex === 0) activate(visibleOptions.length - 1);
       }
     });
-    search.addEventListener('input', () => {
-      if (dropdown.hidden) open();
-      else renderOptions();
-    });
+    search.addEventListener('input', renderOptions);
     search.addEventListener('keydown', event => {
       if (event.isComposing) return;
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
-        if (dropdown.hidden) open();
-        else if (visibleOptions.length) activate((activeIndex + (event.key === 'ArrowDown' ? 1 : -1) + visibleOptions.length) % visibleOptions.length);
+        if (visibleOptions.length) activate((activeIndex + (event.key === 'ArrowDown' ? 1 : -1) + visibleOptions.length) % visibleOptions.length);
       } else if (event.key === 'Enter') {
         event.preventDefault();
-        if (dropdown.hidden) open();
-        else choose(activeIndex);
+        choose(activeIndex);
       } else if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         close(true);
       } else if (event.key === 'Tab') {
-        close();
+        // Resume normal tab order from the selector, rather than the body portal.
+        close(true);
       }
     });
     document.addEventListener('pointerdown', event => {
-      if (!dropdown.contains(event.target) && !trigger.contains(event.target) && event.target !== search) close();
+      if (!dropdown.contains(event.target) && !trigger.contains(event.target)) close();
     });
     document.addEventListener('focusin', event => {
-      if (!dropdown.contains(event.target) && !trigger.contains(event.target) && event.target !== search) close();
+      if (!dropdown.contains(event.target) && !trigger.contains(event.target)) close();
     });
     window.addEventListener('resize', position);
     window.addEventListener('scroll', position, true);
