@@ -1,0 +1,229 @@
+"use strict";
+figma.showUI(__html__, { width: 700, height: 840, themeColors: true });
+const TARGET_EMAIL_EXPORT_WIDTH = 1200;
+let selectedFrameId = null;
+function isFrameLike(node) {
+    return node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE';
+}
+function getAutoScale(width) {
+    if (!Number.isFinite(width) || width <= 0)
+        return 1;
+    return Math.round((TARGET_EMAIL_EXPORT_WIDTH / width) * 10000) / 10000;
+}
+function collectLayerBounds(root) {
+    const rootX = root.absoluteTransform[0][2];
+    const rootY = root.absoluteTransform[1][2];
+    const results = [];
+    function walk(node) {
+        if (node.id !== root.id && node.visible !== false) {
+            const bounds = node.absoluteRenderBounds ?? node.absoluteBoundingBox;
+            if (bounds && bounds.width > 1 && bounds.height > 1) {
+                const x = Math.max(0, bounds.x - rootX);
+                const y = Math.max(0, bounds.y - rootY);
+                const right = Math.min(root.width, bounds.x - rootX + bounds.width);
+                const bottom = Math.min(root.height, bounds.y - rootY + bounds.height);
+                if (right > x && bottom > y) {
+                    results.push({ x, y, width: right - x, height: bottom - y });
+                }
+            }
+        }
+        if ('children' in node) {
+            for (const child of node.children)
+                walk(child);
+        }
+    }
+    walk(root);
+    return results.slice(0, 6000);
+}
+function collectTextItems(root) {
+    const rootX = root.absoluteTransform[0][2];
+    const rootY = root.absoluteTransform[1][2];
+    const results = [];
+    function walk(node) {
+        if (node.type === 'TEXT' && node.visible !== false) {
+            const text = node.characters.trim();
+            const bounds = node.absoluteRenderBounds ?? node.absoluteBoundingBox;
+            if (text && bounds && bounds.width > 0 && bounds.height > 0) {
+                const x = Math.max(0, bounds.x - rootX);
+                const y = Math.max(0, bounds.y - rootY);
+                const right = Math.min(root.width, bounds.x - rootX + bounds.width);
+                const bottom = Math.min(root.height, bounds.y - rootY + bounds.height);
+                if (right > x && bottom > y) {
+                    results.push({
+                        id: node.id,
+                        text,
+                        x,
+                        y,
+                        width: right - x,
+                        height: bottom - y
+                    });
+                }
+            }
+        }
+        if ('children' in node) {
+            for (const child of node.children)
+                walk(child);
+        }
+    }
+    walk(root);
+    return results.slice(0, 4000);
+}
+async function sendSelection() {
+    const selection = figma.currentPage.selection;
+    if (selection.length !== 1 || !isFrameLike(selection[0])) {
+        selectedFrameId = null;
+        figma.ui.postMessage({
+            type: 'SELECTION_ERROR',
+            message: 'Select exactly one email frame, component, or instance.'
+        });
+        return;
+    }
+    const frame = selection[0];
+    selectedFrameId = frame.id;
+    try {
+        const preview = await frame.exportAsync({
+            format: 'PNG',
+            constraint: { type: 'WIDTH', value: Math.min(900, Math.max(300, frame.width)) }
+        });
+        figma.ui.postMessage({
+            type: 'FRAME_READY',
+            frame: {
+                id: frame.id,
+                name: frame.name,
+                width: frame.width,
+                height: frame.height,
+                autoScale: getAutoScale(frame.width)
+            },
+            layerBounds: collectLayerBounds(frame),
+            textItems: collectTextItems(frame),
+            preview
+        });
+    }
+    catch (error) {
+        figma.ui.postMessage({
+            type: 'SELECTION_ERROR',
+            message: error instanceof Error ? error.message : 'Could not render the selected frame.'
+        });
+    }
+}
+function normaliseCuts(values, max) {
+    return [...new Set(values.map(value => Math.round(value * 100) / 100))]
+        .filter(value => value > 2 && value < max - 2)
+        .sort((a, b) => a - b);
+}
+function buildRegions(width, height, horizontalCuts, verticalCutsBySection, excludeAfterLastCut) {
+    const cuts = normaliseCuts(horizontalCuts, height);
+    const yStops = excludeAfterLastCut && cuts.length ? [0, ...cuts] : [0, ...cuts, height];
+    const regions = [];
+    for (let sectionIndex = 0; sectionIndex < yStops.length - 1; sectionIndex += 1) {
+        const top = yStops[sectionIndex];
+        const bottom = yStops[sectionIndex + 1];
+        const verticalCuts = normaliseCuts(verticalCutsBySection[String(sectionIndex)] ?? [], width);
+        const xStops = [0, ...verticalCuts, width];
+        for (let columnIndex = 0; columnIndex < xStops.length - 1; columnIndex += 1) {
+            const left = xStops[columnIndex];
+            const right = xStops[columnIndex + 1];
+            const regionWidth = right - left;
+            const regionHeight = bottom - top;
+            if (regionWidth <= 0 || regionHeight <= 0)
+                continue;
+            const sliceNumber = regions.length + 1;
+            regions.push({
+                id: `${sectionIndex}-${columnIndex}`,
+                sectionIndex,
+                columnIndex,
+                x: left,
+                y: top,
+                width: regionWidth,
+                height: regionHeight,
+                filename: `${sliceNumber}.jpg`
+            });
+        }
+    }
+    return regions;
+}
+async function exportRegions(request) {
+    if (!selectedFrameId) {
+        figma.ui.postMessage({ type: 'EXPORT_ERROR', message: 'Select an email frame first.' });
+        return;
+    }
+    const node = await figma.getNodeByIdAsync(selectedFrameId);
+    if (!node || node.type === 'DOCUMENT' || node.type === 'PAGE' || !isFrameLike(node)) {
+        figma.ui.postMessage({ type: 'EXPORT_ERROR', message: 'The selected frame no longer exists.' });
+        return;
+    }
+    const regions = buildRegions(node.width, node.height, request.horizontalCuts, request.verticalCutsBySection, request.excludeAfterLastCut);
+    if (regions.length === 0) {
+        figma.ui.postMessage({ type: 'EXPORT_ERROR', message: 'No valid slices were generated.' });
+        return;
+    }
+    const temporaryCropFrames = [];
+    try {
+        for (let index = 0; index < regions.length; index += 1) {
+            const region = regions[index];
+            figma.ui.postMessage({ type: 'EXPORT_PROGRESS', current: index + 1, total: regions.length });
+            // Exporting a SliceNode can produce blank files because the slice itself has
+            // no rendered children. Instead, clone the selected email into a temporary
+            // clipping frame, offset it to the requested region, and export that frame.
+            const cropFrame = figma.createFrame();
+            cropFrame.name = `Inbox Slicer Crop ${region.filename}`;
+            cropFrame.resize(region.width, region.height);
+            cropFrame.clipsContent = true;
+            cropFrame.fills = [];
+            cropFrame.strokes = [];
+            cropFrame.effects = [];
+            cropFrame.x = -100000;
+            cropFrame.y = -100000 - index * (region.height + 20);
+            figma.currentPage.appendChild(cropFrame);
+            temporaryCropFrames.push(cropFrame);
+            const clonedEmail = node.clone();
+            cropFrame.appendChild(clonedEmail);
+            clonedEmail.x = -region.x;
+            clonedEmail.y = -region.y;
+            // Use one scale for every region so the complete email frame always
+            // maps to a 1200 px export canvas. A full-width slice becomes 1200 px,
+            // a half-width slice becomes 600 px, and so on.
+            const exportScale = getAutoScale(node.width);
+            const bytes = await cropFrame.exportAsync({
+                format: 'JPG',
+                constraint: { type: 'SCALE', value: exportScale }
+            });
+            figma.ui.postMessage({
+                type: 'EXPORTED_FILE',
+                filename: region.filename,
+                bytes
+            });
+        }
+        figma.ui.postMessage({
+            type: 'EXPORT_COMPLETE',
+            count: regions.length,
+            zipName: `${node.name.replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '') || 'email'}-slices.zip`
+        });
+        figma.notify(`Prepared ${regions.length} JPEG slices.`);
+    }
+    catch (error) {
+        figma.ui.postMessage({
+            type: 'EXPORT_ERROR',
+            message: error instanceof Error ? error.message : 'Export failed.'
+        });
+    }
+    finally {
+        for (const cropFrame of temporaryCropFrames) {
+            if (!cropFrame.removed)
+                cropFrame.remove();
+        }
+    }
+}
+figma.ui.onmessage = async (message) => {
+    if (message.type === 'PREPARE_KLAVIYO_EXPORT') {
+        figma.notify('Klaviyo table export data prepared.');
+    }
+    if (message.type === 'REFRESH_SELECTION')
+        await sendSelection();
+    if (message.type === 'EXPORT')
+        await exportRegions(message);
+    if (message.type === 'CLOSE')
+        figma.closePlugin();
+};
+figma.on('selectionchange', () => void sendSelection());
+void sendSelection();

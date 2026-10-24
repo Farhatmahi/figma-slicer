@@ -1,0 +1,20 @@
+{
+  "name": "InboxImplementor Slicer",
+  "id": "inboximplementor-slicer",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": [
+    "figma"
+  ],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": [
+      "*"
+    ],
+    "reasoning": "The plugin uploads user-created email slices to the backend URL configured by the user for compression, storage, and Klaviyo template preparation.",
+    "devAllowedDomains": [
+      "https://inboximplementor-slicer-backend-production.up.railway.app/"
+    ]
+  }
+}
