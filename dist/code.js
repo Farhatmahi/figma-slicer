@@ -53,7 +53,15 @@ function resizeUi(width, height) {
         figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'The plugin window could not be resized. Try again.' });
     }
 }
-let selectedFrameId = null;
+// Working identity is independent of the user's live canvas selection.
+let workingFrameId = null;
+let workingFrameLocked = false;
+let workingFrameMissing = false;
+let frameRequestVersion = 0;
+let nextSwitchRequestId = 0;
+let pendingFrameSwitch = null;
+let exportInProgress = false;
+let watchedWorkingPage = null;
 function isFrameLike(node) {
     return node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE';
 }
@@ -120,43 +128,184 @@ function collectTextItems(root) {
     walk(root);
     return results.slice(0, 4000);
 }
-async function sendSelection() {
-    const selection = figma.currentPage.selection;
-    if (selection.length !== 1 || !isFrameLike(selection[0])) {
-        selectedFrameId = null;
-        figma.ui.postMessage({
-            type: 'SELECTION_ERROR',
-            message: 'Select exactly one email frame, component, or instance.'
-        });
+function postWorkingFrameState() {
+    figma.ui.postMessage({
+        type: 'WORKING_FRAME_LOCK_STATE',
+        frameId: workingFrameId,
+        locked: workingFrameLocked,
+        missing: workingFrameMissing
+    });
+}
+function cancelFrameSwitch() {
+    const pending = pendingFrameSwitch;
+    pendingFrameSwitch = null;
+    frameRequestVersion += 1;
+    if (pending)
+        figma.ui.postMessage({ type: 'FRAME_SWITCH_CANCELED', requestId: pending.requestId });
+}
+function markWorkingFrameMissing() {
+    if (!workingFrameId || workingFrameMissing)
         return;
+    workingFrameMissing = true;
+    figma.ui.postMessage({
+        type: 'WORKING_FRAME_MISSING',
+        frameId: workingFrameId,
+        message: 'The working frame was deleted or is unavailable. Your edits are preserved. Restore it in Figma, or unlock and choose another frame.'
+    });
+    postWorkingFrameState();
+}
+function watchWorkingPage(frame) {
+    let parent = frame.parent;
+    while (parent && parent.type !== 'PAGE' && parent.type !== 'DOCUMENT')
+        parent = parent.parent;
+    const page = parent?.type === 'PAGE' ? parent : null;
+    if (page === watchedWorkingPage)
+        return;
+    if (watchedWorkingPage && typeof watchedWorkingPage.off === 'function') {
+        watchedWorkingPage.off('nodechange', workingPageChanged);
     }
-    const frame = selection[0];
-    selectedFrameId = frame.id;
+    watchedWorkingPage = page;
+    // Page-level nodechange works with dynamic-page documents without loading all pages.
+    if (page && typeof page.on === 'function')
+        page.on('nodechange', workingPageChanged);
+}
+function workingPageChanged(event) {
+    if (event.nodeChanges.some(change => change.type === 'DELETE' || change.type === 'CREATE')) {
+        void validateWorkingFrame();
+    }
+}
+async function validateWorkingFrame() {
+    const id = workingFrameId;
+    if (!id)
+        return null;
     try {
+        const node = await figma.getNodeByIdAsync(id);
+        if (workingFrameId !== id)
+            return null;
+        if (!node || node.removed || node.type === 'DOCUMENT' || node.type === 'PAGE' || !isFrameLike(node)) {
+            markWorkingFrameMissing();
+            return null;
+        }
+        watchWorkingPage(node);
+        if (workingFrameMissing) {
+            workingFrameMissing = false;
+            postWorkingFrameState();
+        }
+        return node;
+    }
+    catch {
+        if (workingFrameId === id)
+            figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', message: 'Could not check the working frame. Refresh it and try again; your edits are preserved.' });
+        return null;
+    }
+}
+async function loadWorkingFrame(frameId, preserveEdits, switchConfirmed = false) {
+    const version = ++frameRequestVersion;
+    const oldId = workingFrameId;
+    const oldLocked = workingFrameLocked;
+    try {
+        const frame = await figma.getNodeByIdAsync(frameId);
+        if (version !== frameRequestVersion)
+            return;
+        if (!frame || frame.removed || frame.type === 'DOCUMENT' || frame.type === 'PAGE' || !isFrameLike(frame)) {
+            if (frameId === workingFrameId)
+                markWorkingFrameMissing();
+            else
+                figma.ui.postMessage({ type: oldId ? 'WORKING_FRAME_SELECTION_NOTICE' : 'SELECTION_ERROR', message: 'The chosen frame no longer exists. Your current work is preserved.' });
+            return;
+        }
         const preview = await frame.exportAsync({
             format: 'PNG',
             constraint: { type: 'WIDTH', value: Math.min(900, Math.max(300, frame.width)) }
         });
+        if (version !== frameRequestVersion || frame.removed)
+            return;
+        const layerBounds = collectLayerBounds(frame);
+        const textItems = collectTextItems(frame);
+        workingFrameId = frame.id;
+        workingFrameLocked = preserveEdits && oldId === frame.id ? oldLocked : true;
+        workingFrameMissing = false;
+        pendingFrameSwitch = null;
+        watchWorkingPage(frame);
         figma.ui.postMessage({
             type: 'FRAME_READY',
-            frame: {
-                id: frame.id,
-                name: frame.name,
-                width: frame.width,
-                height: frame.height,
-                autoScale: getAutoScale(frame.width)
-            },
-            layerBounds: collectLayerBounds(frame),
-            textItems: collectTextItems(frame),
-            preview
+            frame: { id: frame.id, name: frame.name, width: frame.width, height: frame.height, autoScale: getAutoScale(frame.width) },
+            layerBounds, textItems, preview,
+            locked: workingFrameLocked,
+            preserveEdits: preserveEdits && oldId === frame.id,
+            switchConfirmed
         });
+        postWorkingFrameState();
     }
     catch (error) {
+        if (version !== frameRequestVersion)
+            return;
         figma.ui.postMessage({
-            type: 'SELECTION_ERROR',
+            type: workingFrameId ? 'WORKING_FRAME_SELECTION_NOTICE' : 'SELECTION_ERROR',
             message: error instanceof Error ? error.message : 'Could not render the selected frame.'
         });
     }
+}
+async function sendSelection(explicitRefresh = false) {
+    if (workingFrameId && workingFrameLocked) {
+        if (explicitRefresh)
+            await loadWorkingFrame(workingFrameId, true);
+        else
+            await validateWorkingFrame();
+        return;
+    }
+    const selection = figma.currentPage.selection;
+    if (selection.length !== 1 || !isFrameLike(selection[0])) {
+        cancelFrameSwitch();
+        if (!workingFrameId)
+            figma.ui.postMessage({ type: 'SELECTION_ERROR', message: 'Select exactly one email frame, component, or instance.' });
+        else
+            figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', message: 'Select one frame, component, or instance to switch. Your current working frame and edits are unchanged.' });
+        return;
+    }
+    const frame = selection[0];
+    if (!workingFrameId) {
+        await loadWorkingFrame(frame.id, false);
+        return;
+    }
+    if (frame.id === workingFrameId) {
+        cancelFrameSwitch();
+        if (explicitRefresh)
+            await loadWorkingFrame(frame.id, true);
+        else
+            await validateWorkingFrame();
+        return;
+    }
+    if (exportInProgress) {
+        figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', message: 'Wait for image export to finish before switching frames. Your current work is unchanged.' });
+        return;
+    }
+    cancelFrameSwitch();
+    pendingFrameSwitch = { requestId: ++nextSwitchRequestId, frameId: frame.id, fromFrameId: workingFrameId };
+    figma.ui.postMessage({
+        type: 'FRAME_SWITCH_REQUEST', requestId: pendingFrameSwitch.requestId, fromFrameId: workingFrameId,
+        frame: { id: frame.id, name: frame.name, width: frame.width, height: frame.height }
+    });
+}
+function setWorkingFrameLock(message) {
+    if (!workingFrameId || message.frameId !== workingFrameId || typeof message.locked !== 'boolean')
+        return;
+    cancelFrameSwitch();
+    workingFrameLocked = message.locked;
+    // Unlocking changes only this flag; it never adopts the current canvas selection.
+    postWorkingFrameState();
+}
+async function decideFrameSwitch(message) {
+    const pending = pendingFrameSwitch;
+    if (!pending || message.requestId !== pending.requestId)
+        return;
+    if (!message.accept || workingFrameLocked || workingFrameId !== pending.fromFrameId || exportInProgress) {
+        cancelFrameSwitch();
+        if (exportInProgress)
+            figma.ui.postMessage({ type: 'WORKING_FRAME_SELECTION_NOTICE', message: 'Wait for image export to finish before switching frames.' });
+        return;
+    }
+    await loadWorkingFrame(pending.frameId, false, true);
 }
 function normaliseCuts(values, max) {
     return [...new Set(values.map(value => Math.round(value * 100) / 100))]
@@ -195,17 +344,28 @@ function buildRegions(width, height, horizontalCuts, verticalCutsBySection, excl
     return regions;
 }
 async function exportRegions(request) {
-    if (!selectedFrameId) {
+    if (!workingFrameId) {
         figma.ui.postMessage({ type: 'EXPORT_ERROR', message: 'Select an email frame first.' });
         return;
     }
-    const node = await figma.getNodeByIdAsync(selectedFrameId);
-    if (!node || node.type === 'DOCUMENT' || node.type === 'PAGE' || !isFrameLike(node)) {
-        figma.ui.postMessage({ type: 'EXPORT_ERROR', message: 'The selected frame no longer exists.' });
+    if (exportInProgress) {
+        figma.ui.postMessage({ type: 'EXPORT_ERROR', message: 'An image export is already in progress.' });
+        return;
+    }
+    if (request.workingFrameId && request.workingFrameId !== workingFrameId) {
+        figma.ui.postMessage({ type: 'EXPORT_ERROR', message: 'The export does not match the current working frame. Refresh and try again.' });
+        return;
+    }
+    exportInProgress = true;
+    const node = await validateWorkingFrame();
+    if (!node) {
+        exportInProgress = false;
+        figma.ui.postMessage({ type: 'EXPORT_ERROR', message: 'The working frame no longer exists or could not be accessed. Your edits are preserved.' });
         return;
     }
     const regions = buildRegions(node.width, node.height, request.horizontalCuts, request.verticalCutsBySection, request.excludeAfterLastCut);
     if (regions.length === 0) {
+        exportInProgress = false;
         figma.ui.postMessage({ type: 'EXPORT_ERROR', message: 'No valid slices were generated.' });
         return;
     }
@@ -260,6 +420,7 @@ async function exportRegions(request) {
         });
     }
     finally {
+        exportInProgress = false;
         for (const cropFrame of temporaryCropFrames) {
             if (!cropFrame.removed)
                 cropFrame.remove();
@@ -276,12 +437,16 @@ figma.ui.onmessage = async (message) => {
     if (message.type === 'PREPARE_KLAVIYO_EXPORT') {
         figma.notify('Klaviyo table export data prepared.');
     }
+    if (message.type === 'SET_WORKING_FRAME_LOCK')
+        setWorkingFrameLock(message);
+    if (message.type === 'FRAME_SWITCH_DECISION')
+        await decideFrameSwitch(message);
     if (message.type === 'REFRESH_SELECTION')
-        await sendSelection();
+        await sendSelection(true);
     if (message.type === 'EXPORT')
         await exportRegions(message);
     if (message.type === 'CLOSE')
         figma.closePlugin();
 };
-figma.on('selectionchange', () => void sendSelection());
+figma.on('selectionchange', () => { void sendSelection(); });
 void sendSelection();

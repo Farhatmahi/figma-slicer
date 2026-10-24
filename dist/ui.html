@@ -104,6 +104,16 @@
     #frameName { font-size: 13px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
     #frameMeta { font-size: 11px; color: var(--ii-muted); margin-top: 4px; overflow-wrap: anywhere; }
     .frame-check { color: var(--ii-success); font-size: 16px; }
+    .frame-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+    #frameLockBtn { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 8px; font-size: 11px; }
+    #frameLockBtn[aria-pressed=true] { border-color: #b8e6f6; background: var(--ii-accent-soft); color: #006b95; }
+    .frame-lock-status { padding: 0 16px 12px; color: var(--ii-muted); font-size: 11px; overflow-wrap: anywhere; }
+    .frame-lock-status[data-missing=true] { color: var(--ii-error); }
+    .frame-switch-dialog { max-width: min(420px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--ii-border); border-radius: 8px; color: var(--ii-text); background: var(--ii-bg); box-shadow: 0 12px 40px rgb(16 24 40 / 18%); }
+    .frame-switch-dialog::backdrop { background: rgb(16 24 40 / 35%); }
+    .frame-switch-dialog h2 { margin: 0 0 12px; font-size: 16px; font-weight: 650; }
+    .frame-switch-dialog p { margin: 0 0 12px; font-size: 12px; overflow-wrap: anywhere; }
+    .frame-switch-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
     .slicing-tools { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; }
     .slicing-tools button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 60px; padding: 8px 4px; font-size: 11px; }
     .slicing-tools svg { width: 18px; height: 18px; }
@@ -281,7 +291,8 @@
         <div id="workflowPanel" aria-label="Email template workflow">
           <section id="frameStep" class="card workflow-step" aria-labelledby="frameStepTitle">
             <div class="card-head"><span class="card-number">1</span><div><h2 id="frameStepTitle" class="card-title">Select Frame</h2><div class="card-subtitle">Your selected design in Figma</div></div><div class="card-head-actions"><button id="refreshBtn" type="button">Refresh</button></div></div>
-            <div class="card-body selected-frame"><img id="frameThumbnail" class="frame-thumbnail" alt="Selected frame thumbnail"><div class="frame-copy"><div id="frameName"></div><div id="frameMeta"></div></div><span class="frame-check" title="Frame selected" aria-label="Frame selected">✓</span></div>
+            <div class="card-body selected-frame"><img id="frameThumbnail" class="frame-thumbnail" alt="Selected frame thumbnail"><div class="frame-copy"><div id="frameName"></div><div id="frameMeta"></div></div><div class="frame-actions"><span class="frame-check" title="Frame selected" aria-label="Frame selected">✓</span><button id="frameLockBtn" type="button" aria-pressed="true" aria-label="Unlock working frame" disabled><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span id="frameLockLabel">Unlock</span></button></div></div>
+            <div id="frameLockStatus" class="frame-lock-status" role="status">The working frame locks automatically.</div>
           </section>
           <section id="sliceStep" class="card workflow-step" aria-labelledby="sliceStepTitle">
             <div class="card-head"><span class="card-number">2</span><div><h2 id="sliceStepTitle" class="card-title">Slice Layout</h2><div class="card-subtitle">Create rows, then split them into columns</div></div></div>
@@ -400,6 +411,12 @@
       </div>
     </main>
     <div id="toastRegion" class="toast-region" aria-label="Notifications"></div>
+    <dialog id="frameSwitchDialog" class="frame-switch-dialog" aria-labelledby="frameSwitchTitle" aria-describedby="frameSwitchDescription">
+      <h2 id="frameSwitchTitle">Switch working frame?</h2>
+      <p id="frameSwitchDescription"></p>
+      <p>Switching clears the current slice layout, content edits and prepared images. This cannot be undone inside the plugin.</p>
+      <div class="frame-switch-actions"><button id="cancelFrameSwitch" type="button">Keep current frame</button><button id="confirmFrameSwitch" type="button" class="primary">Switch frame</button></div>
+    </dialog>
     <button id="windowResizeHandle" type="button" title="Resize plugin window. Arrow keys adjust size." aria-label="Resize plugin window"></button>
   </div>
 <script>/*!
@@ -418,6 +435,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 <script>
   const state = {
     frame: null,
+    frameLocked: true,
+    frameMissing: false,
     layerBounds: [],
     textItems: [],
     previewUrl: null,
@@ -459,6 +478,87 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   const preview = $('preview');
   const previewWrap = $('previewWrap');
   let reviewContextOpen = false;
+  let pendingFrameSwitch = null;
+  let loadingFrameSwitch = null;
+  let frameLockRequestPending = false;
+  let framePreviewRevision = 0;
+
+  function hasWorkingFrameEdits() {
+    return Boolean(state.horizontalCuts.length || state.history.length ||
+      Object.values(state.verticalCutsBySection).some(cuts => cuts.length) ||
+      Object.values(state.altSelections).some(ids => ids.length) ||
+      Object.keys(state.altCtaBySlice).length || Object.values(state.altTextOverrides).some(text => text.trim()) ||
+      Object.values(state.altManualEdited).some(Boolean) || Object.keys(state.sliceUrlOverrides).length ||
+      state.klaviyoFiles.length || state.exportFiles.length || state.preparedBackendResult || $('klaviyoDefaultUrl').value.trim());
+  }
+
+  function workingFrameBusy() {
+    return state.exporting || state.backendUploading || state.klaviyoCreating || Boolean(loadingFrameSwitch);
+  }
+
+  function syncWorkingFrameControls() {
+    const locked = state.frameLocked;
+    $('frameLockBtn').disabled = !state.frame || workingFrameBusy() || frameLockRequestPending;
+    $('refreshBtn').disabled = workingFrameBusy();
+    $('frameLockBtn').setAttribute('aria-pressed', String(locked));
+    $('frameLockBtn').setAttribute('aria-label', locked ? 'Unlock working frame' : 'Lock working frame');
+    $('frameLockBtn').title = locked ? 'Keep this email active while selecting other Figma layers. Unlock to change it.' : 'Lock the current working frame';
+    $('frameLockLabel').textContent = locked ? 'Unlock' : 'Lock';
+    $('frameLockStatus').textContent = state.frameMissing
+      ? 'Working frame deleted. Your work is kept here. Undo the deletion in Figma, or unlock and choose another frame.'
+      : locked ? 'Working frame locked. Other canvas selections won’t change this email.'
+      : 'Unlocked. Select another frame in Figma, or use Refresh to switch intentionally.';
+    $('frameLockStatus').dataset.missing = String(state.frameMissing);
+    if (state.frameMissing) {
+      $('prepareKlaviyo').disabled = true;
+      $('exportBtn').disabled = true;
+      $('createKlaviyoTemplate').disabled = true;
+    }
+  }
+
+  function decideFrameSwitch(accept) {
+    if (!pendingFrameSwitch) return;
+    const request = pendingFrameSwitch;
+    pendingFrameSwitch = null;
+    if ($('frameSwitchDialog').open) $('frameSwitchDialog').close();
+    if (accept) {
+      loadingFrameSwitch = request;
+      $('workflowPanel').inert = true;
+      $('previewPanel').inert = true;
+      setExportControlsDisabled(true);
+      $('createKlaviyoTemplate').disabled = true;
+      $('status').textContent = 'Loading the new working frame…';
+      syncWorkingFrameControls();
+    }
+    parent.postMessage({ pluginMessage: { type: 'FRAME_SWITCH_DECISION', requestId: request.requestId, accept } }, '*');
+  }
+
+  function finishFrameSwitchLoad() {
+    if (!loadingFrameSwitch) return;
+    loadingFrameSwitch = null;
+    $('workflowPanel').inert = false;
+    $('previewPanel').inert = false;
+    setExportControlsDisabled(workingFrameBusy());
+    $('createKlaviyoTemplate').disabled = workingFrameBusy() || state.frameMissing || !state.preparedBackendResult;
+    syncWorkingFrameControls();
+  }
+
+  function requestFrameSwitch(message) {
+    if (message.fromFrameId !== (state.frame && state.frame.id)) return;
+    if (workingFrameBusy()) {
+      parent.postMessage({ pluginMessage: { type: 'FRAME_SWITCH_DECISION', requestId: message.requestId, accept: false } }, '*');
+      showToast('Wait for the current export, upload or template creation to finish before switching frames.', 'warning');
+      return;
+    }
+    pendingFrameSwitch = message;
+    if (!hasWorkingFrameEdits()) {
+      decideFrameSwitch(true);
+      return;
+    }
+    $('frameSwitchDescription').textContent = `Switch from “${state.frame.name}” to “${message.frame.name}”?`;
+    if (!$('frameSwitchDialog').open) $('frameSwitchDialog').showModal();
+    $('cancelFrameSwitch').focus({ preventScroll: true });
+  }
 
   function snapshot() {
     state.klaviyoFiles = [];
@@ -879,6 +979,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     // Existing inline status remains authoritative; notices never replace errors.
     const lastNotices = new Map();
     const syncFeedback = () => {
+      syncWorkingFrameControls();
       const busy = state.exporting || state.backendUploading || state.klaviyoCreating;
       $('createStep').classList.toggle('is-busy', busy);
       $('createStep').setAttribute('aria-busy', String(busy));
@@ -1168,7 +1269,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   async function uploadKlaviyoAssets() {
-    if (state.backendUploading || state.exporting) return;
+    if (state.backendUploading || state.exporting || loadingFrameSwitch) return;
+    if (state.frameMissing) {
+      $('status').textContent = 'The working frame was deleted. Restore it or unlock and choose another frame before uploading.';
+      return;
+    }
 
     const uploadStatus = $('uploadStatus');
     const payload = buildKlaviyoPayload();
@@ -1261,13 +1366,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       $('klaviyoPayloadBox').scrollIntoView({ behavior: 'smooth', block: 'end' });
     } finally {
       state.backendUploading = false;
-      $('prepareKlaviyo').disabled = false;
+      $('prepareKlaviyo').disabled = state.frameMissing;
     }
   }
 
 
   async function createKlaviyoTemplate() {
-    if (state.klaviyoCreating || state.backendUploading) return;
+    if (state.klaviyoCreating || state.backendUploading || loadingFrameSwitch) return;
+    if (state.frameMissing) {
+      $('klaviyoCreateStatus').textContent = 'The working frame was deleted. Restore it or choose another working frame before creating a template.';
+      return;
+    }
 
     const prepared = state.preparedBackendResult;
     const slices = prepared && Array.isArray(prepared.slices) ? prepared.slices : [];
@@ -1344,8 +1453,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       $('status').textContent = 'Klaviyo template creation failed.';
     } finally {
       state.klaviyoCreating = false;
-      $('createKlaviyoTemplate').disabled = false;
-      $('prepareKlaviyo').disabled = false;
+      $('createKlaviyoTemplate').disabled = state.frameMissing;
+      $('prepareKlaviyo').disabled = state.frameMissing;
       $('klaviyoAccount').disabled = state.klaviyoAccounts.length === 0 && !state.fallbackConfigured;
       $('refreshAccounts').disabled = false;
     }
@@ -2126,12 +2235,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   $('refreshBtn').onclick = () => parent.postMessage({ pluginMessage: { type: 'REFRESH_SELECTION' } }, '*');
 
   function setExportControlsDisabled(disabled) {
-    $('exportBtn').disabled = disabled;
-    $('prepareKlaviyo').disabled = disabled;
+    $('exportBtn').disabled = disabled || state.frameMissing;
+    $('prepareKlaviyo').disabled = disabled || state.frameMissing;
   }
 
   function startSliceExport(purpose) {
-    if (state.exporting || !state.frame) return;
+    if (state.exporting || loadingFrameSwitch || !state.frame) return;
+    if (state.frameMissing) {
+      $('status').textContent = 'The working frame was deleted. Restore it or unlock and choose another frame before exporting.';
+      return;
+    }
     state.exporting = true;
     state.exportPurpose = purpose;
     state.exportFiles = [];
@@ -2146,6 +2259,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     parent.postMessage({ pluginMessage: {
       type: 'EXPORT',
+      workingFrameId: state.frame.id,
       horizontalCuts: state.horizontalCuts,
       verticalCutsBySection: state.verticalCutsBySection,
       excludeAfterLastCut: $('excludeAfterLastCut').checked,
@@ -2173,28 +2287,88 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const message = event.data.pluginMessage;
     if (!message) return;
 
+    if (message.type === 'WORKING_FRAME_LOCK_STATE' && state.frame && message.frameId === state.frame.id) {
+      const wasMissing = state.frameMissing;
+      state.frameLocked = message.locked;
+      state.frameMissing = Boolean(message.missing);
+      frameLockRequestPending = false;
+      if (wasMissing && !state.frameMissing) {
+        setExportControlsDisabled(workingFrameBusy());
+        $('createKlaviyoTemplate').disabled = workingFrameBusy() || !state.preparedBackendResult;
+        $('status').textContent = 'Working frame restored. Your slices and content edits are preserved.';
+      }
+      syncWorkingFrameControls();
+    }
+    if (message.type === 'FRAME_SWITCH_REQUEST') requestFrameSwitch(message);
+    if (message.type === 'FRAME_SWITCH_CANCELED') {
+      if (pendingFrameSwitch && message.requestId === pendingFrameSwitch.requestId) {
+        pendingFrameSwitch = null;
+        if ($('frameSwitchDialog').open) $('frameSwitchDialog').close();
+      }
+      if (loadingFrameSwitch && message.requestId === loadingFrameSwitch.requestId) finishFrameSwitchLoad();
+    }
+    if (message.type === 'WORKING_FRAME_MISSING' && state.frame && message.frameId === state.frame.id) {
+      state.frameMissing = true;
+      frameLockRequestPending = false;
+      $('status').textContent = message.message;
+      syncWorkingFrameControls();
+    }
+    if (message.type === 'WORKING_FRAME_SELECTION_NOTICE') {
+      finishFrameSwitchLoad();
+      frameLockRequestPending = false;
+      $('status').textContent = message.message;
+      syncWorkingFrameControls();
+    }
+
     if (message.type === 'SELECTION_ERROR') {
+      if (state.frame) {
+        $('status').textContent = `Working frame unchanged. ${message.message}`;
+        return;
+      }
       state.frame = null; $('workspace').style.display = 'none'; $('status').textContent = message.message;
       $('emptyWorkspace').hidden = false;
     }
 
     if (message.type === 'FRAME_READY') {
+      const sameFrame = state.frame && state.frame.id === message.frame.id;
+      if (state.frame && !sameFrame && !message.switchConfirmed) {
+        $('status').textContent = 'Working frame unchanged. Unlock and confirm a frame switch before replacing this email.';
+        return;
+      }
+      const previewRevision = ++framePreviewRevision;
+      const previousScroll = { top: previewWrap.scrollTop, left: previewWrap.scrollLeft };
+      if (!sameFrame) {
+        cancelAnimationFrame(activeSliceScrollFrame);
+        pendingFrameSwitch = null;
+        if ($('frameSwitchDialog').open) $('frameSwitchDialog').close();
+        state.horizontalCuts = [];
+        state.verticalCutsBySection = {};
+        state.selectedSection = 0;
+        state.history = [];
+        state.klaviyoFiles = [];
+        state.exportFiles = [];
+        state.preparedBackendResult = null;
+        state.sliceUrlOverrides = {};
+        state.altSelections = {};
+        state.altCtaBySlice = {};
+        state.altTextOverrides = {};
+        state.altManualEdited = {};
+        state.activeReviewIndex = 0;
+        state.snapPreview = null;
+        $('klaviyoPayloadBox').style.display = 'none';
+        $('backendResultBox').style.display = 'none';
+        $('klaviyoCreateResultBox').style.display = 'none';
+        $('klaviyoCreateStatus').textContent = '';
+        $('uploadStatus').textContent = '';
+        $('createKlaviyoTemplate').disabled = true;
+      }
       if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
       state.frame = message.frame;
+      state.frameLocked = message.locked !== false;
+      state.frameMissing = false;
+      frameLockRequestPending = false;
       state.layerBounds = message.layerBounds || [];
       state.textItems = message.textItems || [];
-      state.horizontalCuts = [];
-      state.verticalCutsBySection = {};
-      state.selectedSection = 0;
-      state.history = [];
-      state.klaviyoFiles = [];
-      state.sliceUrlOverrides = {};
-      state.altSelections = {};
-      state.altCtaBySlice = {};
-      state.altTextOverrides = {};
-      state.altManualEdited = {};
-      state.activeReviewIndex = 0;
-      state.snapPreview = null;
       const exportScale = Number(message.frame.autoScale);
       const scaleLabel = Number.isInteger(exportScale)
         ? `${exportScale}x`
@@ -2204,16 +2378,19 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       $('scaleRule').textContent = `Full-width export: 1200 px`;
       const blob = new Blob([message.preview], { type: 'image/png' });
       state.previewUrl = URL.createObjectURL(blob);
-      preview.src = state.previewUrl;
       preview.onload = () => {
-        state.fitWidth = Math.min(590, state.frame.width);
-        state.zoom = 0.5;
+        if (previewRevision !== framePreviewRevision) return;
+        finishFrameSwitchLoad();
+        if (!sameFrame) {
+          state.fitWidth = Math.min(590, state.frame.width);
+          state.zoom = 0.5;
+        }
         const width = state.fitWidth * state.zoom;
         canvas.style.width = `${width}px`;
         canvas.style.height = `${state.frame.height * width / state.frame.width}px`;
-        $('zoomValue').textContent = '50%';
-        previewWrap.scrollLeft = 0;
-        previewWrap.scrollTop = 0;
+        $('zoomValue').textContent = `${Math.round(state.zoom * 100)}%`;
+        previewWrap.scrollLeft = sameFrame ? previousScroll.left : 0;
+        previewWrap.scrollTop = sameFrame ? previousScroll.top : 0;
         $('frameName').textContent = state.frame.name;
         $('frameName').title = state.frame.name;
         $('frameThumbnail').src = state.previewUrl;
@@ -2222,8 +2399,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         $('status').textContent = `Frame ready. ${state.layerBounds.length} layer bounds available for snapping.`;
         $('workspace').style.display = 'block';
         $('emptyWorkspace').hidden = true;
+        setExportControlsDisabled(workingFrameBusy());
+        $('createKlaviyoTemplate').disabled = workingFrameBusy() || state.frameMissing || !state.preparedBackendResult;
+        syncWorkingFrameControls();
         render();
       };
+      preview.onerror = () => {
+        if (previewRevision !== framePreviewRevision) return;
+        finishFrameSwitchLoad();
+        $('status').textContent = 'Could not display the working frame preview. Refresh to retry; the working frame and edits are kept.';
+      };
+      preview.src = state.previewUrl;
     }
 
     if (message.type === 'EXPORT_PROGRESS') $('status').textContent = `Creating JPEG ${message.current} of ${message.total}…`;
@@ -2271,6 +2457,19 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 </script>
 
 <script>
+  $('frameLockBtn').onclick = () => {
+    if (!state.frame || workingFrameBusy() || frameLockRequestPending) return;
+    frameLockRequestPending = true;
+    syncWorkingFrameControls();
+    parent.postMessage({ pluginMessage: { type: 'SET_WORKING_FRAME_LOCK', frameId: state.frame.id, locked: !state.frameLocked } }, '*');
+  };
+  $('cancelFrameSwitch').onclick = () => decideFrameSwitch(false);
+  $('confirmFrameSwitch').onclick = () => decideFrameSwitch(true);
+  $('frameSwitchDialog').addEventListener('cancel', event => {
+    event.preventDefault();
+    decideFrameSwitch(false);
+  });
+
   $('excludeAfterLastCut').onchange = () => {
     state.klaviyoFiles = [];
     state.preparedBackendResult = null;

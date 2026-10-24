@@ -384,8 +384,11 @@ assert(launchOptions && launchOptions.width >= 840, 'Actual controller launch mu
     await page.reload(); await revealFrame();
     await page.waitForFunction(expected => Math.abs(parseFloat(getComputedStyle(document.querySelector('.workspace-layout')).getPropertyValue('--preview-ratio')) / 100 - expected) < 0.001, persistedRatio);
     assert.equal(await page.evaluate(() => state.zoom), 0.5);
+    const workingFrameBeforeCanvasError = await page.evaluate(() => JSON.stringify({ frame: state.frame, cuts: state.horizontalCuts, alt: state.altTextOverrides, cta: state.altCtaBySlice, urls: state.sliceUrlOverrides }));
     await post({ type: 'SELECTION_ERROR', message: 'Select exactly one email frame, component, or instance.' });
-    await page.locator('#workspace').waitFor({ state: 'hidden' });
+    await settle();
+    assert(await page.locator('#workspace').isVisible(), 'Unrelated canvas selection errors must not hide the working frame');
+    assert.equal(await page.evaluate(() => JSON.stringify({ frame: state.frame, cuts: state.horizontalCuts, alt: state.altTextOverrides, cta: state.altCtaBySlice, urls: state.sliceUrlOverrides })), workingFrameBeforeCanvasError);
     assert.match(await page.locator('#status').textContent(), /Select exactly one/);
     assert.deepEqual(errors, []);
     console.log(`PASS: ${manifest.ui} five-step redesign preserves slicing, coordinates across split/resize/zoom, review edits/CTA/URLs, keyboard controls, preferences without zoom, export/upload/template contracts, and actionable error recovery; responsive layouts and non-overlapping notification dock verified.`);
