@@ -9,6 +9,6 @@
   "devDependencies": {
     "@figma/plugin-typings": "latest",
     "esbuild": "latest",
-    "typescript": "latest"
+    "typescript": "5.9.3"
   }
 }

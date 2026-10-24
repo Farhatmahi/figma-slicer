@@ -5,373 +5,299 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>InboxImplementor Slicer</title>
   <style>
+    /* Design tokens: intentionally light, independent of the Figma editor theme. */
     :root {
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: var(--figma-color-text);
-      background: var(--figma-color-bg);
-      --ii-accent: #00bfff;
-      --ii-accent-strong: #00a9dc;
-      --ii-black: #090909;
-      --ii-radius: 12px;
-      --ii-border: var(--figma-color-border);
-      --ii-muted: var(--figma-color-text-secondary);
-      --ii-surface: var(--figma-color-bg-secondary);
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --ii-bg: #ffffff; --ii-canvas: #f5f7fa; --ii-text: #101828;
+      --ii-muted: #667085; --ii-border: #e4e7ec; --ii-surface: #f9fafb;
+      --ii-accent: #00b8f5; --ii-accent-strong: #009ed6; --ii-accent-soft: #eaf8ff;
+      --ii-success: #087c4c; --ii-error: #c43227; --ii-warning: #ad5700;
+      --ii-radius: 8px; --ii-shadow: 0 2px 6px rgb(16 24 40 / 4%);
+      --figma-color-bg: var(--ii-bg); --figma-color-text: var(--ii-text);
+      --figma-color-bg-secondary: var(--ii-surface); --figma-color-text-secondary: var(--ii-muted);
+      --figma-color-border: var(--ii-border); --figma-color-border-brand: var(--ii-accent-strong);
+      --figma-color-icon-disabled: #d0d5dd; --preview-ratio: 38%;
+      color: var(--ii-text); background: var(--ii-canvas);
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-size: 12px; background: var(--figma-color-bg); }
-    button, input, select, textarea { font: inherit; }
-    button, select, input, textarea {
-      border: 1px solid var(--ii-border);
-      background: var(--figma-color-bg);
-      color: var(--figma-color-text);
-      border-radius: 8px;
-    }
-    button { min-height: 34px; padding: 0 12px; cursor: pointer; font-weight: 600; }
-    button:hover:not(:disabled) { border-color: var(--figma-color-border-brand); }
-    button.primary {
-      background: var(--ii-accent);
-      border-color: var(--ii-accent);
-      color: #001018;
-      font-weight: 800;
-    }
-    button.primary:hover:not(:disabled) { background: var(--ii-accent-strong); }
+    [hidden] { display: none !important; }
+    body { margin: 0; font-size: 13px; line-height: 1.5; background: var(--ii-canvas); }
+    button, input, select, textarea { font: inherit; color: var(--ii-text); }
+    button, input, select, textarea { border: 1px solid var(--ii-border); border-radius: 6px; background: var(--ii-bg); }
+    button { min-height: 36px; padding: 0 12px; font-weight: 550; cursor: pointer; }
+    button:hover:not(:disabled) { border-color: #a4b0c0; background: var(--ii-surface); }
+    button:active:not(:disabled) { background: #eef2f6; }
+    button:disabled, input:disabled, select:disabled { opacity: .48; cursor: not-allowed; }
+    button.primary { background: var(--ii-accent); border-color: var(--ii-accent); color: #052b3b; font-weight: 650; }
+    button.primary:hover:not(:disabled) { background: var(--ii-accent-strong); border-color: var(--ii-accent-strong); }
     button.secondary { background: var(--ii-surface); }
-    button.active { background: rgba(0, 191, 255, .14); border-color: var(--ii-accent); color: var(--figma-color-text); }
-    button:disabled, select:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
-    input:not([type="checkbox"]):not([type="radio"]), select { width: 100%; min-height: 34px; padding: 0 9px; }
-    input[type="checkbox"], input[type="radio"] {
-      appearance: auto;
-      width: 15px;
-      height: 15px;
-      min-width: 15px;
-      min-height: 15px;
-      padding: 0;
-      margin: 0;
-      flex: 0 0 15px;
-      accent-color: var(--ii-accent);
-      border-radius: 0;
-      background: transparent;
-    }
-    textarea { width: 100%; padding: 10px; line-height: 1.4; resize: vertical; }
-    details > summary { cursor: pointer; user-select: none; }
-
-    .app-shell { min-height: 100vh; }
-    .app-header {
-      position: sticky; top: 0; z-index: 30;
-      display: flex; align-items: center; gap: 12px;
-      padding: 14px 16px;
-      background: color-mix(in srgb, var(--figma-color-bg) 92%, transparent);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--ii-border);
-    }
-    .brand-mark {
-      width: 34px; height: 34px; display: grid; place-items: center;
-      border-radius: 10px; background: var(--ii-black); color: var(--ii-accent);
-      font-weight: 900; letter-spacing: -.5px;
-    }
+    button.active { color: #006b95; background: var(--ii-accent-soft); border-color: #90ddf7; }
+    :focus-visible { outline: 2px solid var(--ii-accent-strong); outline-offset: 3px; }
+    input:not([type=checkbox]):not([type=radio]), select { width: 100%; min-width: 0; min-height: 36px; padding: 0 10px; }
+    input::placeholder, textarea::placeholder { color: #7b8595; }
+    input[type=checkbox], input[type=radio] { width: 15px; height: 15px; margin: 0; flex: 0 0 15px; accent-color: #008bbf; }
+    textarea { width: 100%; min-width: 0; padding: 10px 12px; line-height: 1.6; resize: vertical; }
+    details > summary { cursor: pointer; font-size: 12px; font-weight: 550; }
+    svg { flex: none; vertical-align: middle; }
+    .app-shell { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    .app-header { flex: none; z-index: 30; display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 12px 20px; border-bottom: 1px solid var(--ii-border); background: var(--ii-bg); }
+    .brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; background: #101828; color: var(--ii-accent); font-size: 15px; font-weight: 750; letter-spacing: -1px; }
     .brand-copy { min-width: 0; }
-    .brand-title { font-size: 15px; font-weight: 850; line-height: 1.15; }
-    .brand-subtitle { color: var(--ii-muted); margin-top: 2px; }
-    .version-pill { margin-left: auto; padding: 5px 8px; border-radius: 999px; background: var(--ii-surface); color: var(--ii-muted); font-size: 10px; }
-
-    .stepbar {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-      padding: 10px 16px 0;
-    }
-    .step-pill {
-      display: flex; align-items: center; justify-content: center; gap: 5px;
-      min-height: 28px; padding: 4px 6px; border-radius: 8px;
-      background: var(--ii-surface); color: var(--ii-muted); font-weight: 650; font-size: 10px;
-    }
-    .step-pill b { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--figma-color-bg); }
-
-    #status {
-      margin: 10px 16px 0; padding: 10px 12px;
-      border: 1px solid var(--ii-border); border-left: 3px solid var(--ii-accent);
-      border-radius: 9px; background: var(--ii-surface); line-height: 1.4;
-    }
-    #workspace { display: none; padding: 12px 16px 20px; }
-    .card {
-      margin-bottom: 12px; border: 1px solid var(--ii-border); border-radius: var(--ii-radius);
-      background: var(--figma-color-bg); overflow: hidden;
-    }
-    .card-head {
-      display: flex; align-items: center; gap: 10px; padding: 12px 13px;
-      border-bottom: 1px solid var(--ii-border); background: var(--ii-surface);
-    }
-    .card-number { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 7px; background: var(--ii-black); color: var(--ii-accent); font-weight: 900; }
-    .card-title { font-size: 13px; font-weight: 800; }
-    .card-subtitle { color: var(--ii-muted); margin-top: 2px; font-size: 11px; }
-    .card-body { padding: 12px; }
-    .card-head-actions { margin-left: auto; display: flex; gap: 6px; }
-    .card-head-actions button { min-height: 29px; padding: 0 9px; }
-
-    .selected-frame { display: flex; align-items: center; gap: 10px; }
-    .frame-check { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: rgba(0,191,255,.15); color: var(--ii-accent-strong); font-size: 16px; font-weight: 900; }
-    #frameMeta { font-weight: 750; line-height: 1.45; }
-
-    .slicing-tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-    .slicing-tools button { padding: 0 7px; }
-    .history-tools { display: flex; gap: 7px; margin-top: 7px; }
-    .history-tools button { flex: 1; background: var(--ii-surface); }
-    .zoom-toolbar { display: flex; gap: 6px; align-items: center; margin: 10px 0 8px; }
-    .zoom-toolbar button { min-width: 34px; padding: 0 8px; background: var(--ii-surface); }
-    #zoomValue { min-width: 48px; text-align: center; font-weight: 750; }
-    .zoom-hint { margin-left: auto; color: var(--ii-muted); font-size: 10px; }
-    #previewWrap { position: relative; width: 100%; max-height: 470px; overflow: auto; border: 1px solid var(--ii-border); border-radius: 10px; background: #e9eaec; }
-    #canvas { position: relative; margin: 0 auto; cursor: crosshair; }
+    .brand-title { font-size: 18px; font-weight: 650; letter-spacing: -.5px; line-height: 1.25; }
+    .brand-subtitle { font-size: 11px; color: var(--ii-muted); margin-top: 2px; }
+    .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .version-pill { display: inline-flex; align-items: center; white-space: nowrap; padding: 3px 8px; border: 1px solid var(--ii-border); border-radius: 5px; color: var(--ii-muted); background: var(--ii-surface); font-size: 11px; font-weight: 500; }
+    .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 36px; padding: 0; }
+    #status { flex: none; margin: 12px 20px; padding: 8px 12px; border: 1px solid var(--ii-border); border-radius: 6px; background: var(--ii-bg); color: var(--ii-muted); font-size: 12px; overflow-wrap: anywhere; max-height: 18vh; overflow-y: auto; }
+    #status[data-tone=error] { border-color: #fecdca; color: var(--ii-error); background: #fffbfa; }
+    .empty-workspace { flex: 1; min-height: 0; overflow-y: auto; width: 100%; margin: 20px auto; max-width: 440px; padding: 32px 24px; text-align: center; }
+    .empty-workspace svg { color: #98a2b3; margin-bottom: 16px; }
+    .empty-workspace h1 { font-size: 20px; font-weight: 650; letter-spacing: -.4px; }
+    .empty-workspace p { color: var(--ii-muted); margin-bottom: 20px; }
+    #workspace { display: none; flex: 1; min-height: 0; padding: 0 20px 20px; overflow-y: auto; }
+    .workspace-layout { display: flex; align-items: flex-start; min-width: 0; }
+    #previewPanel { flex: 0 0 var(--preview-width, var(--preview-ratio)); min-width: 260px; position: sticky; top: 0; min-height: 0; }
+    #workflowPanel { flex: 1 1 0; min-width: 400px; }
+    #panelDivider { flex: 0 0 16px; align-self: stretch; min-height: 120px; padding: 0; border: 0; border-radius: 0; background: transparent; cursor: col-resize; touch-action: none; position: relative; }
+    #panelDivider::before { content: ''; position: absolute; left: 7px; width: 2px; top: 12px; bottom: 12px; background: var(--ii-border); border-radius: 2px; }
+    #panelDivider:hover::before, #panelDivider:focus-visible::before { background: var(--ii-accent); }
+    body.resizing-panels { cursor: col-resize; user-select: none; }
+    .preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 12px; }
+    .preview-heading h2 { margin: 0; font-size: 14px; font-weight: 600; }
+    .preview-heading span { font-size: 11px; color: var(--ii-muted); }
+    .zoom-toolbar { display: flex; align-items: center; gap: 4px; padding: 8px; background: var(--ii-bg); border: 1px solid var(--ii-border); border-bottom: 0; border-radius: 8px 8px 0 0; }
+    .zoom-toolbar button { min-height: 28px; min-width: 28px; padding: 0 8px; border-color: transparent; }
+    #zoomValue { min-width: 44px; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .zoom-hint { margin-left: auto; font-size: 10px; color: var(--ii-muted); }
+    #previewWrap { position: relative; width: 100%; max-height: max(120px, calc(100vh - 236px - var(--notification-space, 0px))); min-height: min(180px, 25vh); overflow: auto; padding: 16px 0; background: #edf0f4; border: 1px solid var(--ii-border); border-radius: 0 0 8px 8px; overscroll-behavior: contain; }
+    #canvas { position: relative; margin: 0 auto; cursor: crosshair; background: #fff; box-shadow: 0 2px 8px rgb(16 24 40 / 10%); }
     #preview { display: block; width: 100%; height: auto; user-select: none; pointer-events: none; }
     #previewWrap.panning, #previewWrap.panning * { cursor: grabbing !important; user-select: none; }
     #previewWrap.pan-ready { cursor: grab; }
-    .guide-h, .guide-v { position: absolute; z-index: 3; background: #ff3b30; box-shadow: 0 0 0 1px rgba(255,255,255,.85); }
-    .guide-h { left: 0; width: 100%; height: 2px; transform: translateY(-1px); cursor: pointer; }
-    .guide-v { top: 0; height: 100%; width: 2px; transform: translateX(-1px); cursor: pointer; background: #007aff; }
+    .preview-caption { margin: 8px 0 0; font-size: 11px; color: var(--ii-muted); }
+    .guide-h, .guide-v { position: absolute; z-index: 3; box-shadow: 0 0 0 1px rgb(255 255 255 / 80%); }
+    .guide-h { left: 0; width: 100%; height: 2px; background: #f04438; transform: translateY(-1px); cursor: pointer; }
+    .guide-v { width: 2px; background: #008bbf; transform: translateX(-1px); cursor: pointer; }
     .section { position: absolute; left: 0; width: 100%; z-index: 1; border: 1px solid transparent; }
-    .section.selected { border: 2px solid #007aff; background: rgba(0,122,255,.08); }
-    .slice-label { position: absolute; z-index: 4; padding: 2px 5px; border-radius: 4px; background: rgba(0,0,0,.76); color: #fff; font-size: 10px; pointer-events: none; }
-    .snap-line { position: absolute; z-index: 5; pointer-events: none; background: #34c759; opacity: .9; }
+    .section.selected { border: 1px solid #008bbf; background: rgb(0 184 245 / 4%); }
+    .slice-label { position: absolute; z-index: 4; padding: 1px 5px; min-height: 20px; border: 0; border-radius: 3px; background: #101828; color: #fff; font-size: 10px; line-height: 18px; font-weight: 600; }
+    button.slice-label:hover:not(:disabled) { background: #006b95; color: #fff; }
+    .snap-line { position: absolute; z-index: 5; pointer-events: none; background: #12b76a; }
     .snap-line.h { left: 0; width: 100%; height: 1px; }
     .snap-line.v { top: 0; height: 100%; width: 1px; }
-    .excluded-zone { background: rgba(255,149,0,.16) !important; border: 2px dashed #ff9500 !important; }
-    .excluded-label { background: rgba(255,149,0,.9); }
-    .help { color: var(--ii-muted); line-height: 1.45; }
-    .help-details { margin-top: 9px; padding: 8px 10px; border-radius: 8px; background: var(--ii-surface); }
-
-    .text-slices { overflow: visible; }
-    .review-workspace { display: grid; grid-template-columns: 238px minmax(0, 1fr); min-height: 520px; }
-    .review-context { border-right: 1px solid var(--ii-border); background: var(--ii-surface); padding: 12px; }
-    .review-context-sticky { position: sticky; top: 66px; }
-    .review-slice-kicker { color: var(--ii-muted); font-size: 10px; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; }
-    .review-slice-heading { display: flex; align-items: center; gap: 7px; margin-top: 3px; font-size: 15px; font-weight: 850; }
-    .review-state-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--figma-color-icon-disabled); }
-    .review-state-dot.done { background: #34c759; }
-    .review-crop-stage { min-height: 188px; margin-top: 10px; padding: 10px; display: grid; place-items: center; border: 1px solid var(--ii-border); border-radius: 10px; background: #dfe1e5; overflow: hidden; }
-    .review-crop { position: relative; overflow: hidden; background: #fff; box-shadow: 0 3px 12px rgba(0,0,0,.14); }
-    .review-crop img { position: absolute; max-width: none; user-select: none; pointer-events: none; }
-    .review-map-label { margin-top: 11px; color: var(--ii-muted); font-size: 10px; font-weight: 700; }
-    .review-map-stage { min-height: 110px; margin-top: 6px; padding: 8px; display: grid; place-items: center; border: 1px solid var(--ii-border); border-radius: 9px; background: var(--figma-color-bg); overflow: hidden; }
-    .review-map { position: relative; overflow: hidden; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
-    .review-map img { position: absolute; inset: 0; width: 100%; height: 100%; user-select: none; pointer-events: none; }
-    .review-map-highlight { position: absolute; border: 2px solid var(--ii-accent); background: rgba(0,191,255,.18); box-shadow: 0 0 0 1px rgba(0,0,0,.2); }
-    .review-meta { margin-top: 10px; display: grid; gap: 5px; color: var(--ii-muted); font-size: 10px; line-height: 1.35; }
-    .review-meta strong { color: var(--figma-color-text); }
-    .review-editor { min-width: 0; background: var(--figma-color-bg); }
-    .review-toolbar { position: sticky; top: 66px; z-index: 12; padding: 10px 12px; border-bottom: 1px solid var(--ii-border); background: color-mix(in srgb, var(--figma-color-bg) 94%, transparent); backdrop-filter: blur(10px); }
-    .review-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 7px; align-items: center; }
-    .review-nav button { min-width: 68px; background: var(--ii-surface); }
-    .review-nav select { min-width: 0; }
-    .review-progress { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--ii-muted); font-size: 10px; }
-    .review-progress-track { flex: 1; height: 5px; overflow: hidden; border-radius: 999px; background: var(--ii-surface); }
-    .review-progress-fill { height: 100%; border-radius: inherit; background: var(--ii-accent); }
-    .review-slice-strip { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 1px; scrollbar-width: thin; }
-    .review-slice-chip { min-width: 34px; min-height: 29px; padding: 0 8px; background: var(--ii-surface); color: var(--ii-muted); font-size: 10px; }
-    .review-slice-chip.current { background: rgba(0,191,255,.14); border-color: var(--ii-accent); color: var(--figma-color-text); }
-    .review-slice-chip.done::after { content: ' ✓'; color: #22a447; font-weight: 900; }
-    .review-editor-body { padding: 12px; }
-    .review-global-settings { padding: 12px; border-top: 1px solid var(--ii-border); background: var(--ii-surface); }
-    .review-global-settings .field-help { margin-top: 5px; color: var(--ii-muted); font-size: 11px; line-height: 1.4; }
-    .slice-link-panel { margin-bottom: 12px; padding: 10px; border: 1px solid var(--ii-border); border-radius: 10px; background: var(--ii-surface); }
-    .slice-link-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
-    .slice-link-title { font-weight: 750; }
-    .slice-link-panel input { width: 100%; }
-    .slice-link-note { margin-top: 6px; color: var(--ii-muted); font-size: 11px; line-height: 1.35; }
-    .slice-link-reset { min-height: 26px; padding: 0 8px; font-size: 10px; }
-    .text-slice { padding: 0; }
-    .text-slice-title { display: flex; align-items: center; gap: 6px; min-height: 31px; font-size: 13px; font-weight: 800; margin-bottom: 7px; }
-    .text-slice-title button { min-height: 27px; margin-left: 0; padding: 0 8px; background: var(--ii-surface); font-size: 10px; }
+    .excluded-zone { background: rgb(247 144 9 / 9%) !important; border: 1px dashed #d98a1a !important; }
+    .excluded-label { background: #a35c05; pointer-events: none; }
+    .review-highlight { position: absolute; z-index: 2; pointer-events: none; border: 2px solid #00a5dc; background: rgb(0 184 245 / 8%); box-shadow: inset 0 0 0 1px white; }
+    /* One uninterrupted workflow; sections are not navigation gates. */
+    .card { background: var(--ii-bg); border: 1px solid var(--ii-border); border-radius: var(--ii-radius); margin-bottom: 12px; min-width: 0; box-shadow: var(--ii-shadow); overflow: hidden; }
+    .card-head { display: flex; align-items: center; gap: 10px; padding: 16px; border-bottom: 1px solid #f0f2f5; }
+    .card-number { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; border: 1px solid #cceefb; border-radius: 6px; color: #006b95; background: var(--ii-accent-soft); font-size: 12px; font-weight: 650; }
+    .card-title { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.2px; }
+    .card-subtitle { font-size: 11px; color: var(--ii-muted); margin-top: 3px; }
+    .card-body { padding: 16px; }
+    .card-head-actions { margin-left: auto; }
+    .card-head-actions button { min-height: 30px; padding: 0 8px; font-size: 11px; }
+    .selected-frame { display: flex; align-items: center; gap: 12px; }
+    .frame-thumbnail { width: 44px; height: 52px; flex: none; object-fit: cover; object-position: top; border: 1px solid var(--ii-border); border-radius: 4px; background: var(--ii-canvas); }
+    .frame-copy { min-width: 0; flex: 1; }
+    #frameName { font-size: 13px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+    #frameMeta { font-size: 11px; color: var(--ii-muted); margin-top: 4px; overflow-wrap: anywhere; }
+    .frame-check { color: var(--ii-success); font-size: 16px; }
+    .slicing-tools { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; }
+    .slicing-tools button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 60px; padding: 8px 4px; font-size: 11px; }
+    .slicing-tools svg { width: 18px; height: 18px; }
+    .history-tools { display: flex; gap: 8px; margin-top: 12px; }
+    .history-tools button { flex: 1; font-size: 12px; }
+    .help-details { margin-top: 12px; color: var(--ii-muted); }
+    .help { font-size: 11px; line-height: 1.6; margin-top: 8px; }
+    .field { display: block; min-width: 0; }
+    .field > span { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 550; }
+    .field-help { margin-top: 6px; color: var(--ii-muted); font-size: 11px; }
+    .field-grid, .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .review-global-settings { padding: 12px 16px; background: var(--ii-surface); border-bottom: 1px solid var(--ii-border); }
+    .text-slices { min-width: 0; }
+    .review-workspace { display: flex; flex-direction: column; }
+    .review-editor { min-width: 0; }
+    .review-toolbar { padding: 12px 16px; border-bottom: 1px solid var(--ii-border); background: var(--ii-bg); }
+    .review-nav { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 8px; align-items: center; }
+    .review-nav button { padding: 0 8px; font-size: 11px; }
+    .review-progress { display: flex; align-items: center; gap: 12px; margin-top: 10px; color: var(--ii-muted); font-size: 11px; }
+    .review-progress-track { flex: 1; min-width: 28px; height: 4px; overflow: hidden; border-radius: 4px; background: #edf0f4; }
+    .review-progress-fill { height: 100%; background: #00a4df; border-radius: inherit; }
+    .review-slice-strip { display: flex; gap: 6px; overflow-x: auto; padding: 10px 1px 2px; scrollbar-width: thin; }
+    .review-slice-chip { min-width: 28px; min-height: 26px; padding: 0 6px; font-size: 11px; }
+    .review-slice-chip.current { background: var(--ii-accent-soft); border-color: #79d6f3; color: #006b95; }
+    .review-slice-chip.done::after { content: ' ✓'; color: var(--ii-success); }
+    .review-editor-body { padding: 16px; }
+    .text-slice-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+    .text-slice-title button { min-height: 26px; padding: 0 6px; font-size: 10px; }
     .text-slice-title button:first-of-type { margin-left: auto; }
-    .text-selection-summary { margin-bottom: 7px; color: var(--ii-muted); font-size: 10px; }
-    .review-bottom-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-    .review-bottom-nav button { background: var(--ii-surface); }
-    .review-highlight { position: absolute; z-index: 2; pointer-events: none; border: 3px solid var(--ii-accent); background: rgba(0,191,255,.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.85); }
-    @media (max-width: 620px) {
-      .review-workspace { grid-template-columns: 1fr; }
-      .review-context { border-right: 0; border-bottom: 1px solid var(--ii-border); }
-      .review-context-sticky, .review-toolbar { position: static; }
-      .review-crop-stage { min-height: 150px; }
-    }
-    .text-row {
-      display: grid;
-      grid-template-columns: 16px minmax(0,1fr) 48px 48px;
-      align-items: center;
-      gap: 7px;
-      min-height: 38px;
-      padding: 6px 0;
-      border-top: 1px solid var(--ii-border);
-    }
-    .text-row:first-of-type { border-top: 0; }
-    .text-value {
-      min-width: 0;
-      white-space: pre-wrap;
-      line-height: 1.3;
-      word-break: break-word;
-      font-size: 11px;
-    }
-    .text-choice { align-self: center; }
-    .cta-choice {
-      display: inline-flex;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 5px;
-      min-width: 0;
-      color: var(--ii-muted);
-      font-size: 10px;
-      line-height: 1;
-      white-space: nowrap;
-    }
-    .copy-small { min-height: 24px; padding: 0 6px; background: var(--ii-surface); font-size: 10px; }
-    .alt-builder { margin-top: 8px; padding: 9px; border: 1px solid var(--ii-border); border-radius: 9px; background: var(--ii-surface); }
-    .alt-builder-actions { display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
-    .alt-builder-actions button { min-height: 24px; padding: 0 7px; font-size: 10px; }
-    .alt-builder > .cta-choice { margin: 0 0 7px !important; }
-    .alt-final { min-height: 52px; margin-top: 5px; background: var(--figma-color-bg); font-size: 11px; }
-    #ctaDivider { max-width: 86px; text-align: center; font-size: 11px; }
-    .empty-text { padding: 12px; color: var(--ii-muted); }
-
-    .account-picker { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-bottom: 8px; }
-    .account-picker button { white-space: nowrap; }
+    .text-selection-summary { font-size: 11px; color: var(--ii-muted); margin-bottom: 10px; }
+    .text-row { display: grid; grid-template-columns: 16px minmax(0,1fr) 44px 36px; align-items: start; gap: 8px; padding: 10px 0; border-top: 1px solid #f0f2f5; }
+    .text-choice { margin-top: 3px !important; }
+    .text-value { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+    .text-value::before { content: 'T'; display: inline-block; margin-right: 6px; color: #98a2b3; font-size: 10px; font-weight: 650; }
+    .cta-choice { display: inline-flex; align-items: center; gap: 4px; color: var(--ii-muted); font-size: 10px; white-space: nowrap; }
+    .cta-choice:has(input:checked) { color: #006b95; }
+    .copy-small { min-height: 24px; padding: 0 4px; font-size: 10px; }
+    .alt-builder { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--ii-border); font-size: 12px; }
+    .alt-builder > .cta-choice { margin: 0 0 10px !important; }
+    .alt-final { min-height: 80px; margin-top: 6px; }
+    .slice-link-panel { margin-top: 16px; }
+    .slice-link-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+    .slice-link-title { font-size: 12px; font-weight: 550; }
+    .slice-link-reset { min-height: 24px; padding: 0 6px; font-size: 10px; }
+    .slice-link-note { margin-top: 6px; font-size: 11px; color: var(--ii-muted); }
+    .review-bottom-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+    .review-bottom-nav button { font-size: 11px; }
+    .empty-text { padding: 16px; font-size: 12px; color: var(--ii-muted); }
+    .review-context { border-top: 1px solid var(--ii-border); padding: 12px 16px; background: var(--ii-surface); }
+    .review-context-sticky { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; padding-top: 12px; }
+    .review-slice-kicker, .review-slice-heading, .review-map-label { grid-column: 1 / -1; margin: 0; font-size: 11px; font-weight: 550; color: var(--ii-muted); }
+    .review-slice-heading { display: flex; align-items: center; gap: 6px; color: var(--ii-text); }
+    .review-state-dot { width: 6px; height: 6px; border-radius: 50%; background: #d0d5dd; }
+    .review-state-dot.done { background: #12b76a; }
+    .review-crop-stage, .review-map-stage { min-height: 80px; max-width: 100%; overflow: auto; padding: 8px; display: grid; place-items: center; background: #edf0f4; border-radius: 4px; }
+    .review-crop, .review-map { position: relative; overflow: hidden; background: white; }
+    .review-crop img { position: absolute; max-width: none; pointer-events: none; }
+    .review-map img { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .review-map-highlight { position: absolute; border: 2px solid #008bbf; background: rgb(0 184 245 / 12%); }
+    .review-meta { grid-column: 1 / -1; font-size: 11px; color: var(--ii-muted); display: grid; gap: 4px; }
+    .account-picker { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: end; margin-bottom: 6px; }
+    .account-select-trigger { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; font-weight: 400; }
+    .account-select-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account-select-trigger::after { content: '▾'; color: var(--ii-muted); }
+    .account-dropdown { position: fixed; z-index: 50; padding: 8px; display: flex; flex-direction: column; gap: 6px; border: 1px solid #d0d5dd; border-radius: 8px; background: var(--ii-bg); color: var(--ii-text); box-shadow: 0 6px 20px rgb(16 24 40 / 14%); }
     .account-search { position: relative; flex: none; }
     .account-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ii-muted); pointer-events: none; }
     .account-search #klaviyoAccountSearch { padding-left: 30px; }
-    .account-select-trigger { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; font-weight: 400; }
-    .account-select-trigger .account-select-label { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
-    .account-select-trigger::after { content: '▾'; color: var(--ii-muted); }
-    .account-dropdown { position: fixed; z-index: 50; padding: 8px; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--ii-border); border-radius: 8px; background: var(--figma-color-bg); color: var(--figma-color-text); box-shadow: 0 6px 20px rgba(0,0,0,.2); }
-    .account-dropdown[hidden] { display: none; }
     .account-options { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
-    .account-option { position: relative; padding: 9px 9px 9px 29px; border-radius: 5px; cursor: pointer; overflow-wrap: anywhere; }
-    .account-option:hover { background: var(--ii-surface); }
-    .account-option[aria-selected="true"] { font-weight: 700; }
-    .account-option.active { background: var(--ii-surface); outline: 1px solid var(--ii-accent); outline-offset: -1px; }
-    .account-option[aria-selected="true"]::before { content: '✓'; position: absolute; left: 9px; color: var(--ii-accent); }
-    .account-no-results { padding: 9px; color: var(--ii-muted); }
-    .account-select-trigger:focus-visible, #klaviyoAccountSearch:focus-visible { outline: 2px solid var(--ii-accent); outline-offset: 1px; }
-    .account-status { min-height: 16px; margin-bottom: 10px; color: var(--ii-muted); line-height: 1.35; }
-    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .field { display: block; }
-    .field span { display: block; margin-bottom: 6px; font-weight: 700; }
-    .check-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; line-height: 1.35; }
-    .check-row input { margin-top: 1px; }
-    .url-overrides { margin-top: 10px; border: 1px solid var(--ii-border); border-radius: 9px; padding: 9px; }
-    .url-overrides summary { font-weight: 750; }
-    .workflow-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-    .workflow-actions button { width: 100%; }
-    .settings-panel { margin-top: 10px; border: 1px solid var(--ii-border); border-radius: 9px; padding: 9px; background: var(--ii-surface); }
-    .settings-panel summary { font-weight: 750; }
-    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 10px; }
-    .settings-actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
-    .settings-actions button { margin-left: auto; }
-    .format-note { font-size: 10px; color: var(--ii-muted); }
-
-    .result-card { margin-top: 10px; border: 1px solid var(--ii-border); border-radius: 10px; padding: 10px; background: var(--ii-surface); }
-    .result-title { font-weight: 800; margin-bottom: 7px; }
+    .account-option { position: relative; padding: 8px 8px 8px 28px; border-radius: 4px; cursor: pointer; overflow-wrap: anywhere; font-size: 12px; }
+    .account-option:hover, .account-option.active { background: var(--ii-accent-soft); }
+    .account-option.active { outline: 1px solid #76d2f1; outline-offset: -1px; }
+    .account-option[aria-selected=true] { font-weight: 600; }
+    .account-option[aria-selected=true]::before { content: '✓'; position: absolute; left: 9px; color: #007da9; }
+    .account-no-results, .account-status { font-size: 11px; color: var(--ii-muted); line-height: 1.5; }
+    .account-no-results { padding: 8px; }
+    .account-status { min-height: 18px; margin-bottom: 12px; overflow-wrap: anywhere; }
+    #ctaDivider { max-width: 100px; text-align: center; }
+    .check-row { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; font-size: 12px; }
+    .check-row input { margin-top: 2px; }
+    .settings-panel { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ii-border); }
+    .settings-grid { margin-top: 12px; }
+    .settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+    #scale { max-width: 160px; }
+    .format-note { font-size: 11px; color: var(--ii-muted); }
+    .prepare-action, .create-action { width: 100%; margin-top: 12px; }
+    .create-action { min-height: 40px; }
+    .result-card { margin-top: 12px; padding: 12px; border: 1px solid var(--ii-border); border-radius: 6px; background: var(--ii-surface); }
+    .result-title { font-size: 12px; font-weight: 600; }
+    .status-note { margin-top: 6px; font-size: 11px; color: var(--ii-muted); overflow-wrap: anywhere; }
     .result-actions { display: flex; gap: 8px; margin-top: 8px; }
-    .result-actions .primary { flex: 1; }
-    .status-note { margin-top: 8px; line-height: 1.4; color: var(--ii-muted); }
-    .success-result { border-left: 3px solid #34c759; }
+    .result-actions button { font-size: 11px; }
+    .success-result { border-color: #abefc6; background: #f6fef9; }
     .debug-details { margin-top: 8px; }
-    .debug-details textarea { min-height: 120px; margin-top: 7px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; }
+    .debug-details textarea { min-height: 100px; margin-top: 8px; font: 11px/1.5 ui-monospace, monospace; }
+    .operation-status { min-height: 18px; margin-top: 8px; font-size: 11px; color: var(--ii-muted); }
+    .is-busy .operation-status::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border: 2px solid #bae9fa; border-top-color: #008bbf; border-radius: 50%; animation: spin .9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .toast-region { flex: none; width: 100%; max-height: 26vh; overflow-y: auto; display: grid; gap: 8px; padding: 8px 20px; background: var(--ii-canvas); border-top: 1px solid var(--ii-border); }
+    .toast-region:empty { display: none; }
+    .toast { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid var(--ii-border); border-left: 3px solid #008bbf; border-radius: 8px; box-shadow: 0 4px 12px rgb(16 24 40 / 10%); background: var(--ii-bg); pointer-events: auto; font-size: 12px; }
+    .toast[data-tone=success] { border-left-color: var(--ii-success); }
+    .toast[data-tone=error] { border-left-color: var(--ii-error); }
+    .toast[data-tone=warning] { border-left-color: var(--ii-warning); }
+    .toast p { margin: 0; flex: 1; overflow-wrap: anywhere; }
+    .toast button { min-height: 24px; padding: 0 5px; border: 0; }
+    #windowResizeHandle { position: fixed; bottom: 0; right: 0; width: 20px; height: 20px; min-height: 20px; padding: 0; border: 0; border-radius: 0; background: linear-gradient(135deg, transparent 55%, #98a2b3 56%, #98a2b3 60%, transparent 61%, transparent 72%, #98a2b3 73%, #98a2b3 77%, transparent 78%); cursor: nwse-resize; touch-action: none; z-index: 70; }
+    @media (max-width: 839px) {
+      .workspace-layout { display: flex; flex-direction: column; gap: 20px; }
+      #previewPanel { flex: none; width: 100%; min-width: 0; position: static; }
+      #workflowPanel { width: 100%; min-width: 0; }
+      #panelDivider { display: none; }
+      #previewWrap { max-height: min(440px, 60vh); }
+    }
+    @media (max-width: 479px) {
+      .app-header { padding: 12px; gap: 8px; }
+      .brand-title { font-size: 15px; }
+      .brand-mark { width: 30px; height: 30px; }
+      .brand-subtitle { font-size: 10px; }
+      .header-actions { gap: 4px; }
+      .header-actions .version-pill { display: none; }
+      #status { margin: 12px; }
+      #workspace { padding: 0 12px 20px; }
+      .card-head, .card-body, .review-editor-body { padding: 12px; }
+      .card-head { gap: 8px; }
+      .card-title { font-size: 14px; }
+      .card-subtitle { font-size: 10px; }
+      #textCount { font-size: 10px; padding: 2px 4px; }
+      .review-toolbar, .review-global-settings { padding: 12px; }
+      .review-nav { gap: 4px; }
+      .review-nav button { padding: 0 4px; font-size: 10px; }
+      .field-grid, .settings-grid { grid-template-columns: 1fr; }
+      .zoom-hint { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; }
+    }
   </style>
 </head>
 <body>
   <div class="app-shell">
     <header class="app-header">
-      <div class="brand-mark">II</div>
-      <div class="brand-copy">
-        <div class="brand-title">InboxImplementor Slicer</div>
-        <div class="brand-subtitle">Figma to Klaviyo</div>
+      <div class="brand-mark" aria-hidden="true">II</div>
+      <div class="brand-copy"><div class="brand-title">InboxImplementor Slicer</div><div class="brand-subtitle">Email design, ready for Klaviyo</div></div>
+      <div class="header-actions">
+        <span class="version-pill">v12.0</span>
+        <button id="wideViewBtn" class="icon-button" type="button" title="Switch to wide workspace" aria-label="Switch to wide workspace"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"/></svg></button>
       </div>
-      <div class="version-pill">v11.4</div>
     </header>
-
-    <div class="stepbar" aria-label="Workflow">
-      <div class="step-pill"><b>1</b> Select</div>
-      <div class="step-pill"><b>2</b> Slice</div>
-      <div class="step-pill"><b>3</b> Review</div>
-      <div class="step-pill"><b>4</b> Create</div>
+    <div id="status" role="status" aria-live="polite">Select one email frame in Figma.</div>
+    <div id="emptyWorkspace" class="empty-workspace">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 2v20M16 2v20M2 8h20M2 16h20"/></svg><h1>Your email starts here</h1>
+      <p>Select one email frame, component, or instance in Figma. Its preview, slices, and content will appear here.</p>
+      <button id="emptyRefreshBtn" type="button">Refresh selection</button>
     </div>
-
-    <div id="status">Select one email frame in Figma.</div>
-
     <main id="workspace">
-      <section class="card">
-        <div class="card-head">
-          <div class="card-number">1</div>
-          <div>
-            <div class="card-title">Selected email</div>
-            <div class="card-subtitle">The frame currently connected to the slicer</div>
-          </div>
-          <div class="card-head-actions"><button id="refreshBtn" class="secondary">Refresh</button></div>
-        </div>
-        <div class="card-body selected-frame">
-          <div class="frame-check">✓</div>
-          <div id="frameMeta"></div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-head">
-          <div class="card-number">2</div>
-          <div>
-            <div class="card-title">Slice the email</div>
-            <div class="card-subtitle">Add rows first, then split selected rows into columns</div>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="slicing-tools">
-            <button id="horizontalBtn" class="active">Horizontal</button>
-            <button id="equal2Btn">2 columns</button>
-            <button id="equal3Btn">3 columns</button>
-            <button id="verticalBtn">Custom</button>
-          </div>
-          <div class="history-tools">
-            <button id="undoBtn">Undo last cut</button>
-            <button id="resetBtn">Reset cuts</button>
-          </div>
-
-          <div class="zoom-toolbar">
-            <button id="zoomOutBtn" title="Zoom out">−</button>
-            <span id="zoomValue">50%</span>
-            <button id="zoomInBtn" title="Zoom in">+</button>
-            <button id="fitBtn" title="Fit preview">Fit</button>
+      <div class="workspace-layout">
+        <aside id="previewPanel" aria-label="Email preview workspace">
+          <div class="preview-heading"><h2>Email preview</h2><span id="previewLayerCount"></span></div>
+          <div class="zoom-toolbar" aria-label="Preview controls">
+            <button id="zoomOutBtn" title="Zoom out" aria-label="Zoom out">−</button><span id="zoomValue">50%</span>
+            <button id="zoomInBtn" title="Zoom in" aria-label="Zoom in">+</button><button id="fitBtn" title="Fit preview">Fit</button>
             <span class="zoom-hint">Space + drag to pan</span>
           </div>
           <div id="previewWrap"><div id="canvas"><img id="preview" alt="Selected email preview" /></div></div>
-          <details class="help-details">
-            <summary>How slicing works</summary>
-            <div class="help" style="margin-top:7px;">Click the preview in Horizontal mode to add a full-width cut. Choose 2 columns or 3 columns, then click a row. Custom adds a blue vertical cut with layer-edge snapping. Click any guide to remove it.</div>
-          </details>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-head">
-          <div class="card-number">3</div>
-          <div>
-            <div class="card-title">Review slices, alt text and links</div>
-            <div class="card-subtitle">Review one slice at a time and change its URL only when needed</div>
-          </div>
-          <div id="textCount" class="version-pill"></div>
-        </div>
-        <div class="review-global-settings">
-          <label class="field">
-            <span>Default URL for all slices</span>
-            <input id="klaviyoDefaultUrl" type="url" placeholder="https://brand.com">
-          </label>
-          <div class="field-help">Every slice uses this URL automatically. Change the URL inside an individual slice only when that slice needs a different destination.</div>
-        </div>
-        <div id="textSlices" class="text-slices"><div class="empty-text">Create slices to review their text.</div></div>
-      </section>
-
-      <section class="card" id="klaviyoPanel">
-        <div class="card-head">
-          <div class="card-number">4</div>
-          <div>
-            <div class="card-title">Create Klaviyo template</div>
-            <div class="card-subtitle">Choose the account, upload the reviewed slices, then create the template</div>
-          </div>
-        </div>
-        <div class="card-body">
+          <p class="preview-caption">Click a slice number to review. Use the layout tools to add cuts.</p>
+        </aside>
+        <button id="panelDivider" type="button" role="separator" aria-label="Resize preview panel" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="60" aria-valuenow="38" title="Drag or use arrow keys to resize. Double-click to reset."></button>
+        <div id="workflowPanel" aria-label="Email template workflow">
+          <section id="frameStep" class="card workflow-step" aria-labelledby="frameStepTitle">
+            <div class="card-head"><span class="card-number">1</span><div><h2 id="frameStepTitle" class="card-title">Select Frame</h2><div class="card-subtitle">Your selected design in Figma</div></div><div class="card-head-actions"><button id="refreshBtn" type="button">Refresh</button></div></div>
+            <div class="card-body selected-frame"><img id="frameThumbnail" class="frame-thumbnail" alt="Selected frame thumbnail"><div class="frame-copy"><div id="frameName"></div><div id="frameMeta"></div></div><span class="frame-check" title="Frame selected" aria-label="Frame selected">✓</span></div>
+          </section>
+          <section id="sliceStep" class="card workflow-step" aria-labelledby="sliceStepTitle">
+            <div class="card-head"><span class="card-number">2</span><div><h2 id="sliceStepTitle" class="card-title">Slice Layout</h2><div class="card-subtitle">Create rows, then split them into columns</div></div></div>
+            <div class="card-body">
+              <div class="slicing-tools" role="group" aria-label="Slice layout mode">
+                <button id="horizontalBtn" class="active" aria-pressed="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 12h18"/></svg>Horizontal</button>
+                <button id="equal2Btn" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>2 columns</button>
+                <button id="equal3Btn" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m6-16v16"/></svg>3 columns</button>
+                <button id="verticalBtn" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 11h18M14 11v9"/></svg>Custom</button>
+              </div>
+              <div class="history-tools"><button id="undoBtn">Undo last cut</button><button id="resetBtn">Reset cuts</button></div>
+              <details class="help-details"><summary>How slicing works</summary><div class="help">Click the preview in Horizontal mode to add a full-width cut. Choose 2 columns or 3 columns, then click a row. Custom adds a vertical cut with layer-edge snapping. Click a guide to remove it. Slice numbers open content review without adding cuts.</div></details>
+            </div>
+          </section>
+          <section id="reviewStep" class="card workflow-step" aria-labelledby="reviewStepTitle">
+            <div class="card-head"><span class="card-number">3</span><div><h2 id="reviewStepTitle" class="card-title">Review Content</h2><div class="card-subtitle">Review each slice’s text and destination</div></div><div id="textCount" class="version-pill"></div></div>
+            <div class="review-global-settings"><label class="field"><span>Default URL for all slices</span><input id="klaviyoDefaultUrl" type="url" placeholder="https://brand.com"></label><div class="field-help">Used for every slice unless you set a destination below.</div></div>
+            <div id="textSlices" class="text-slices"><div class="empty-text">Create slices to review their text.</div></div>
+          </section>
+          <section id="klaviyoPanel" class="card workflow-step" aria-labelledby="klaviyoStepTitle">
+            <div class="card-head"><span class="card-number">4</span><div><h2 id="klaviyoStepTitle" class="card-title">Klaviyo Settings</h2><div class="card-subtitle">Choose the destination account and export settings</div></div></div>
+            <div class="card-body">
           <div class="account-picker">
             <div class="field">
               <span id="klaviyoAccountLabel">Klaviyo account</span>
@@ -394,20 +320,37 @@
           </div>
           <div id="accountStatus" class="account-status">Connecting to the account vault…</div>
 
-          <div class="field-grid">
-            <label class="field">
-              <span>Divider before CTA</span>
-              <input id="ctaDivider" value=" | " placeholder=" | ">
-            </label>
-          </div>
 
-          <label class="check-row">
-            <input type="checkbox" id="excludeAfterLastCut" checked>
-            <span>Stop export at the last horizontal cut, so the footer is ignored</span>
-          </label>
-
-          <button id="prepareKlaviyo" class="primary" style="width:100%;margin-top:12px;">Prepare &amp; upload images</button>
-
+              <div class="field-grid"><label class="field"><span>Divider before CTA</span><input id="ctaDivider" value=" | " placeholder=" | "></label></div>
+              <label class="check-row"><input type="checkbox" id="excludeAfterLastCut" checked><span>Stop export at the last horizontal cut, so the footer is ignored</span></label>
+          <details class="settings-panel">
+            <summary>Advanced settings and manual export</summary>
+            <div class="settings-grid">
+              <label class="field">
+                <span>Backend URL</span>
+                <input id="backendUrl" placeholder="https://inboximplementor-slicer-backend-production.up.railway.app/" value="https://inboximplementor-slicer-backend-production.up.railway.app/">
+              </label>
+              <label class="field">
+                <span>Backend token</span>
+                <input id="backendToken" type="password" placeholder="Optional">
+              </label>
+            </div>
+            <div class="settings-actions">
+              <select id="scale" disabled>
+                <option value="1">1200 px target</option>
+              </select>
+              <span id="scaleRule" class="format-note"></span>
+              <button id="exportBtn">Download JPEG ZIP</button>
+            </div>
+          </details>
+            </div>
+          </section>
+          <section id="createStep" class="card workflow-step" aria-labelledby="createStepTitle">
+            <div class="card-head"><span class="card-number">5</span><div><h2 id="createStepTitle" class="card-title">Create Template</h2><div class="card-subtitle">Prepare your images, then send the template to Klaviyo</div></div></div>
+            <div class="card-body">
+              <button id="prepareKlaviyo" class="secondary prepare-action">Prepare &amp; upload images</button>
+              <button id="createKlaviyoTemplate" class="primary create-action" disabled>Create Klaviyo template</button>
+              <div id="operationStatus" class="operation-status" role="status">Create becomes available after the images are prepared.</div>
           <div id="klaviyoPayloadBox" class="result-card" style="display:none;">
             <div class="result-title">Preparing images</div>
             <div class="status-note">The plugin is exporting, compressing, and uploading the reviewed slices.</div>
@@ -426,7 +369,6 @@
             <div class="status-note">The images are compressed and uploaded. Create the Klaviyo template when ready.</div>
             <div class="result-actions">
               <button id="copyBackendResult">Copy debug result</button>
-              <button id="createKlaviyoTemplate" class="primary" disabled>Create Klaviyo template</button>
             </div>
             <div id="klaviyoCreateStatus" class="status-note"></div>
             <details class="debug-details">
@@ -445,29 +387,14 @@
             </details>
           </div>
 
-          <details class="settings-panel">
-            <summary>Advanced settings and manual export</summary>
-            <div class="settings-grid">
-              <label class="field">
-                <span>Backend URL</span>
-                <input id="backendUrl" placeholder="https://inboximplementor-slicer-backend-production.up.railway.app/" value="https://inboximplementor-slicer-backend-production.up.railway.app/">
-              </label>
-              <label class="field">
-                <span>Backend token</span>
-                <input id="backendToken" type="password" placeholder="Optional">
-              </label>
+
             </div>
-            <div class="settings-actions">
-              <select id="scale" disabled style="max-width:155px;">
-                <option value="1">1200 px target</option>
-              </select>
-              <span id="scaleRule" class="format-note"></span>
-              <button id="exportBtn">Download JPEG ZIP</button>
-            </div>
-          </details>
+          </section>
         </div>
-      </section>
+      </div>
     </main>
+    <div id="toastRegion" class="toast-region" aria-label="Notifications"></div>
+    <button id="windowResizeHandle" type="button" title="Resize plugin window. Arrow keys adjust size." aria-label="Resize plugin window"></button>
   </div>
 <script>/*!
 
@@ -525,6 +452,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   const canvas = $('canvas');
   const preview = $('preview');
   const previewWrap = $('previewWrap');
+  let reviewContextOpen = false;
 
   function snapshot() {
     state.klaviyoFiles = [];
@@ -544,6 +472,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     $('equal2Btn').classList.toggle('active', mode === 'equal2');
     $('equal3Btn').classList.toggle('active', mode === 'equal3');
     $('verticalBtn').classList.toggle('active', mode === 'vertical');
+    for (const id of ['horizontalBtn', 'equal2Btn', 'equal3Btn', 'verticalBtn']) {
+      $(id).setAttribute('aria-pressed', String($(id).classList.contains('active')));
+    }
     render();
   }
 
@@ -804,6 +735,187 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const token = $('backendToken').value.trim();
     if (token) headers.Authorization = `Bearer ${token}`;
     return headers;
+  }
+
+  // Presentation preferences are deliberately separate from document/export state.
+  function initWorkspace() {
+    const layout = document.querySelector('.workspace-layout');
+    const divider = $('panelDivider');
+    let panelRatio = 0.38;
+    let layoutTouched = false;
+    let geometryFrame = 0;
+    const wide = () => window.innerWidth >= 840;
+    const post = message => parent.postMessage({ pluginMessage: message }, '*');
+
+    function applyPanelRatio() {
+      if (!wide() || !layout.clientWidth) return;
+      const available = layout.clientWidth - divider.offsetWidth;
+      const left = Math.max(260, Math.min(available - 400, available * panelRatio));
+      layout.style.setProperty('--preview-width', `${left}px`);
+      layout.style.setProperty('--preview-ratio', `${panelRatio * 100}%`);
+      divider.setAttribute('aria-valuenow', String(Math.round(left / available * 100)));
+      divider.setAttribute('aria-valuemin', String(Math.ceil(Math.max(.25, 260 / available) * 100)));
+      divider.setAttribute('aria-valuemax', String(Math.floor(Math.min(.60, (available - 400) / available) * 100)));
+    }
+
+    function changeRatio(value, save = false) {
+      const available = layout.clientWidth - divider.offsetWidth;
+      const min = Math.max(.25, 260 / available);
+      const max = Math.min(.60, (available - 400) / available);
+      panelRatio = Math.max(min, Math.min(max, value));
+      layoutTouched = true;
+      applyPanelRatio();
+      if (save) post({ type: 'SAVE_UI_PREFERENCES', panelRatio });
+    }
+
+    function scheduleGeometry() {
+      cancelAnimationFrame(geometryFrame);
+      geometryFrame = requestAnimationFrame(() => {
+        applyPanelRatio();
+        if (!state.frame || previewWrap.clientWidth < 1) return;
+        const fitWidth = Math.min(590, state.frame.width, Math.max(1, previewWrap.clientWidth - 32));
+        if (Math.abs(fitWidth - state.fitWidth) > .5) {
+          state.fitWidth = fitWidth;
+          // Reuses rendering/coordinate conversion, never the cut snapshot path.
+          applyZoom(state.zoom);
+        }
+      });
+    }
+
+    let draggingDivider = false;
+    divider.addEventListener('pointerdown', event => {
+      if (!wide() || event.button !== 0) return;
+      event.preventDefault();
+      draggingDivider = true;
+      divider.setPointerCapture(event.pointerId);
+      document.body.classList.add('resizing-panels');
+    });
+    divider.addEventListener('pointermove', event => {
+      if (!draggingDivider) return;
+      const rect = layout.getBoundingClientRect();
+      changeRatio((event.clientX - rect.left) / (layout.clientWidth - divider.offsetWidth));
+    });
+    function finishDivider(event) {
+      if (!draggingDivider) return;
+      draggingDivider = false;
+      document.body.classList.remove('resizing-panels');
+      if (divider.hasPointerCapture(event.pointerId)) divider.releasePointerCapture(event.pointerId);
+      post({ type: 'SAVE_UI_PREFERENCES', panelRatio });
+    }
+    divider.addEventListener('pointerup', finishDivider);
+    divider.addEventListener('pointercancel', finishDivider);
+    divider.addEventListener('keydown', event => {
+      if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        changeRatio(event.key === 'Home' ? .25 : event.key === 'End' ? .60 : panelRatio + (event.key === 'ArrowLeft' ? -.02 : .02), true);
+      }
+    });
+    divider.addEventListener('dblclick', () => {
+      changeRatio(.38, true);
+      showToast('Panel layout reset.', 'info');
+    });
+    window.addEventListener('message', event => {
+      const message = event.data && event.data.pluginMessage;
+      if (!message) return;
+      if (message.type === 'UI_PREFERENCES' && !layoutTouched && Number.isFinite(message.panelRatio)) {
+        panelRatio = Math.max(.25, Math.min(.60, message.panelRatio));
+        applyPanelRatio();
+      }
+      if (message.type === 'UI_PREFERENCES_ERROR') showToast(message.message, 'warning');
+    });
+    function updateWindowAction() {
+      const label = wide() ? 'Switch to compact workspace' : 'Switch to wide workspace';
+      $('wideViewBtn').title = label;
+      $('wideViewBtn').setAttribute('aria-label', label);
+      scheduleGeometry();
+    }
+    $('wideViewBtn').onclick = () => post({ type: 'UI_RESIZE', width: wide() ? 700 : 1100, height: window.innerHeight });
+    const grip = $('windowResizeHandle');
+    let resizeStart = null;
+    let pendingResize = 0;
+    grip.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      resizeStart = { x: event.screenX, y: event.screenY, width: window.innerWidth, height: window.innerHeight };
+      grip.setPointerCapture(event.pointerId);
+    });
+    grip.addEventListener('pointermove', event => {
+      if (!resizeStart) return;
+      const width = resizeStart.width + event.screenX - resizeStart.x;
+      const height = resizeStart.height + event.screenY - resizeStart.y;
+      cancelAnimationFrame(pendingResize);
+      pendingResize = requestAnimationFrame(() => post({ type: 'UI_RESIZE', width, height }));
+    });
+    const stopWindowResize = event => {
+      resizeStart = null;
+      if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
+    };
+    grip.addEventListener('pointerup', stopWindowResize);
+    grip.addEventListener('pointercancel', stopWindowResize);
+    grip.addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      post({ type: 'UI_RESIZE', width: window.innerWidth + (event.key === 'ArrowLeft' ? -32 : event.key === 'ArrowRight' ? 32 : 0), height: window.innerHeight + (event.key === 'ArrowUp' ? -32 : event.key === 'ArrowDown' ? 32 : 0) });
+    });
+    new ResizeObserver(scheduleGeometry).observe(previewWrap);
+    new ResizeObserver(scheduleGeometry).observe(layout);
+    new ResizeObserver(() => {
+      const height = $('toastRegion').getBoundingClientRect().height;
+      document.documentElement.style.setProperty('--notification-space', `${height}px`);
+    }).observe($('toastRegion'));
+    window.addEventListener('resize', updateWindowAction);
+    $('emptyRefreshBtn').onclick = () => post({ type: 'REFRESH_SELECTION' });
+    updateWindowAction();
+    post({ type: 'GET_UI_PREFERENCES' });
+
+    // Existing inline status remains authoritative; notices never replace errors.
+    const lastNotices = new Map();
+    const syncFeedback = () => {
+      const busy = state.exporting || state.backendUploading || state.klaviyoCreating;
+      $('createStep').classList.toggle('is-busy', busy);
+      $('createStep').setAttribute('aria-busy', String(busy));
+      const progress = state.klaviyoCreating ? $('klaviyoCreateStatus').textContent : state.backendUploading ? $('uploadStatus').textContent : $('status').textContent;
+      const failed = /failed|cannot reach|could not|no longer exists/i.test($('status').textContent);
+      $('operationStatus').textContent = busy ? progress : failed ? $('status').textContent : (state.preparedBackendResult ? 'Images are ready. You can create the template.' : 'Create becomes available after the images are prepared.');
+      for (const id of ['status', 'klaviyoCreateStatus']) {
+        const message = $(id).textContent.trim();
+        let tone = null;
+        if (/failed|cannot reach|could not|no longer exists/i.test(message)) tone = 'error';
+        else if (/^Done\.|^Klaviyo template created|^Downloaded|^Created “/.test(message)) tone = 'success';
+        else if (/first\.|No .*available|incomplete\./i.test(message)) tone = 'warning';
+        $(id).dataset.tone = tone || 'info';
+        // Prefer the detailed creation error and the single success summary.
+        if ((id === 'status' && /^Template creation failed/.test(message)) || (id === 'klaviyoCreateStatus' && tone === 'success')) continue;
+        if (tone && (!lastNotices.has(message) || Date.now() - lastNotices.get(message) > 10000)) {
+          lastNotices.set(message, Date.now());
+          showToast(message, tone);
+        }
+      }
+    };
+    const feedbackObserver = new MutationObserver(syncFeedback);
+    for (const id of ['status', 'klaviyoCreateStatus', 'uploadStatus']) feedbackObserver.observe($(id), { childList: true, characterData: true, subtree: true });
+  }
+
+  function showToast(message, tone = 'info') {
+    if (!message) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.dataset.tone = tone;
+    toast.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+    const text = document.createElement('p');
+    text.textContent = message;
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.textContent = '×';
+    dismiss.setAttribute('aria-label', 'Dismiss notification');
+    dismiss.onclick = () => toast.remove();
+    toast.append(text, dismiss);
+    $('toastRegion').prepend(toast);
+    $('toastRegion').scrollTop = 0;
+    // Errors require dismissal and always remain in the existing inline status too.
+    if (tone !== 'error') setTimeout(() => toast.remove(), tone === 'warning' ? 10000 : 6000);
   }
 
   function initAccountPicker() {
@@ -1249,6 +1361,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       }
       const old = button.textContent;
       button.textContent = 'Copied';
+      showToast('Copied to clipboard.', 'success');
       setTimeout(() => { button.textContent = old; }, 900);
     } catch (error) {
       $('status').textContent = 'Could not copy text. Select it manually from the list.';
@@ -1361,8 +1474,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const workspace = document.createElement('div');
     workspace.className = 'review-workspace';
 
-    const context = document.createElement('aside');
+    const context = document.createElement('details');
     context.className = 'review-context';
+    context.open = reviewContextOpen;
+    context.addEventListener('toggle', () => {
+      if (context.isConnected) reviewContextOpen = context.open;
+    });
+    const contextSummary = document.createElement('summary');
+    contextSummary.textContent = 'Slice preview & location';
+    context.appendChild(contextSummary);
     const contextSticky = document.createElement('div');
     contextSticky.className = 'review-context-sticky';
 
@@ -1416,12 +1536,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     previous.onclick = () => setActiveReviewIndex(state.activeReviewIndex - 1);
 
     const selector = document.createElement('select');
+    selector.setAttribute('aria-label', 'Current slice');
     for (const entry of regionData) {
       const option = document.createElement('option');
       const entryKey = regionKey(entry.region);
       const hasAlt = Boolean((state.altTextOverrides[entryKey] || '').trim());
       option.value = String(entry.region.number - 1);
-      option.textContent = `Slice ${entry.region.number}${hasAlt ? '  ✓' : ''}`;
+      option.textContent = `Slice ${entry.region.number} of ${regions.length}${hasAlt ? '  ✓' : ''}`;
       selector.appendChild(option);
     }
     selector.value = String(state.activeReviewIndex);
@@ -1496,6 +1617,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     const linkInput = document.createElement('input');
     linkInput.type = 'url';
+    linkInput.setAttribute('aria-label', `Destination URL for slice ${item.region.number}`);
     linkInput.placeholder = defaultSliceUrl || 'https://brand.com';
     linkInput.value = hasSliceOverride() ? state.sliceUrlOverrides[sliceUrlKey] : defaultSliceUrl;
     linkPanel.appendChild(linkInput);
@@ -1527,7 +1649,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     };
 
     refreshLinkState();
-    slice.appendChild(linkPanel);
 
     const title = document.createElement('div');
     title.className = 'text-slice-title';
@@ -1579,6 +1700,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       checkbox.className = 'text-choice';
       checkbox.checked = selectedIds.has(text.id);
       checkbox.title = 'Include in alt text';
+      checkbox.setAttribute('aria-label', `Include in alt text: ${text.text}`);
       checkbox.onchange = () => {
         const current = new Set(state.altSelections[key] || []);
         if (checkbox.checked) current.add(text.id);
@@ -1600,6 +1722,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       ctaLabel.className = 'cta-choice';
       const cta = document.createElement('input');
       cta.type = 'radio';
+      cta.setAttribute('aria-label', `CTA: ${text.text}`);
       cta.name = `cta-${key}`;
       cta.checked = state.altCtaBySlice[key] === text.id;
       cta.onchange = () => {
@@ -1653,6 +1776,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     const altInput = document.createElement('textarea');
     altInput.className = 'alt-final';
+    altInput.setAttribute('aria-label', `Final alt text for slice ${item.region.number}`);
     altInput.placeholder = 'Select text above or type alt text manually';
     altInput.value = syncAltTextForRegion(item.region, item.texts);
     altInput.oninput = () => {
@@ -1662,6 +1786,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     };
     builder.appendChild(altInput);
     slice.appendChild(builder);
+    slice.appendChild(linkPanel);
 
     const bottomNav = document.createElement('div');
     bottomNav.className = 'review-bottom-nav';
@@ -1679,8 +1804,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     body.appendChild(slice);
     editor.appendChild(body);
-    workspace.appendChild(context);
     workspace.appendChild(editor);
+    workspace.appendChild(context);
     container.appendChild(workspace);
   }
 
@@ -1775,8 +1900,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         canvas.appendChild(label);
       } else {
         for (let col = 0; col < xStops.length - 1; col++) {
-          const label = document.createElement('div');
+          const label = document.createElement('button');
+          label.type = 'button';
           label.className = 'slice-label';
+          const reviewIndex = buildUiRegions().findIndex(region => region.sectionIndex === i && region.columnIndex === col);
+          label.setAttribute('aria-label', `Review slice ${reviewIndex + 1}`);
+          label.addEventListener('click', event => {
+            event.stopPropagation();
+            setActiveReviewIndex(reviewIndex);
+          });
           label.textContent = xStops.length > 2 ? `${i + 1}.${col + 1}` : `${i + 1}`;
           label.style.left = `${(xStops[col] + 5) * scale}px`;
           label.style.top = `${(stops[i] + 5) * scale}px`;
@@ -1864,13 +1996,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   window.addEventListener('keydown', event => {
     const target = event.target;
-    const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT');
-    if (event.code === 'Space' && !typing) {
+    const editing = target && target.closest('input, textarea, select, [contenteditable="true"]');
+    const activatingButton = target && target.closest('button');
+    if (event.code === 'Space' && !editing && !activatingButton) {
       state.spacePressed = true;
       previewWrap.classList.add('pan-ready');
       event.preventDefault();
     }
-    if ((event.ctrlKey || event.metaKey) && !typing) {
+    if ((event.ctrlKey || event.metaKey) && !editing) {
       if (event.key === '+' || event.key === '=') { event.preventDefault(); applyZoom(state.zoom * 1.2); }
       if (event.key === '-') { event.preventDefault(); applyZoom(state.zoom / 1.2); }
       if (event.key === '0') { event.preventDefault(); fitPreview(); }
@@ -1974,6 +2107,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     if (message.type === 'SELECTION_ERROR') {
       state.frame = null; $('workspace').style.display = 'none'; $('status').textContent = message.message;
+      $('emptyWorkspace').hidden = false;
     }
 
     if (message.type === 'FRAME_READY') {
@@ -2012,9 +2146,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         $('zoomValue').textContent = '50%';
         previewWrap.scrollLeft = 0;
         previewWrap.scrollTop = 0;
-        $('frameMeta').textContent = `${state.frame.name} • ${Math.round(state.frame.width)} × ${Math.round(state.frame.height)} • Full-width export 1200 px (${scaleLabel})`;
+        $('frameName').textContent = state.frame.name;
+        $('frameName').title = state.frame.name;
+        $('frameThumbnail').src = state.previewUrl;
+        $('frameMeta').textContent = `${Math.round(state.frame.width)} × ${Math.round(state.frame.height)} · Export 1200 px (${scaleLabel})`;
+        $('previewLayerCount').textContent = `${state.layerBounds.length} snapping layers`;
         $('status').textContent = `Frame ready. ${state.layerBounds.length} layer bounds available for snapping.`;
         $('workspace').style.display = 'block';
+        $('emptyWorkspace').hidden = true;
         render();
       };
     }
@@ -2103,6 +2242,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   $('backendUrl').addEventListener('change', () => loadKlaviyoAccounts(false));
   $('backendToken').addEventListener('change', () => loadKlaviyoAccounts(false));
 
+  initWorkspace();
   initAccountPicker();
   loadKlaviyoAccounts(true);
 

@@ -1,6 +1,57 @@
 "use strict";
 figma.showUI(__html__, { width: 700, height: 840, themeColors: true });
 const TARGET_EMAIL_EXPORT_WIDTH = 1200;
+const UI_PREFERENCES_KEY = 'inbox-slicer:ui:v12';
+const DEFAULT_PANEL_RATIO = 0.38;
+let preferenceWrite = Promise.resolve();
+function validPanelRatio(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0.25 && value <= 0.6;
+}
+async function loadUiPreferences() {
+    try {
+        await preferenceWrite;
+        const stored = await figma.clientStorage.getAsync(UI_PREFERENCES_KEY);
+        figma.ui.postMessage({
+            type: 'UI_PREFERENCES',
+            panelRatio: validPanelRatio(stored?.panelRatio) ? stored.panelRatio : DEFAULT_PANEL_RATIO
+        });
+    }
+    catch {
+        figma.ui.postMessage({ type: 'UI_PREFERENCES', panelRatio: DEFAULT_PANEL_RATIO });
+        figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'Panel layout could not be restored.' });
+    }
+}
+async function saveUiPreferences(panelRatio) {
+    if (!validPanelRatio(panelRatio)) {
+        figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'Invalid panel layout. Adjust the divider and try again.' });
+        return;
+    }
+    const write = preferenceWrite.then(() => figma.clientStorage.setAsync(UI_PREFERENCES_KEY, { panelRatio }));
+    // A rejected write must not block later preference changes.
+    preferenceWrite = write.catch(() => { });
+    try {
+        await write;
+        figma.ui.postMessage({ type: 'UI_PREFERENCES_SAVED', panelRatio });
+    }
+    catch {
+        figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'Panel layout could not be saved. Try adjusting the divider again.' });
+    }
+}
+function resizeUi(width, height) {
+    if (typeof width !== 'number' || typeof height !== 'number' || !Number.isFinite(width) || !Number.isFinite(height)) {
+        figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'Invalid window size. Try resizing the plugin again.' });
+        return;
+    }
+    const nextWidth = Math.min(1600, Math.max(360, Math.round(width)));
+    const nextHeight = Math.min(1200, Math.max(420, Math.round(height)));
+    try {
+        figma.ui.resize(nextWidth, nextHeight);
+        figma.ui.postMessage({ type: 'UI_WINDOW_RESIZED', width: nextWidth, height: nextHeight });
+    }
+    catch {
+        figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'The plugin window could not be resized. Try again.' });
+    }
+}
 let selectedFrameId = null;
 function isFrameLike(node) {
     return node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE';
@@ -16,7 +67,7 @@ function collectLayerBounds(root) {
     const results = [];
     function walk(node) {
         if (node.id !== root.id && node.visible !== false) {
-            const bounds = node.absoluteRenderBounds ?? node.absoluteBoundingBox;
+            const bounds = ('absoluteRenderBounds' in node ? node.absoluteRenderBounds : null) ?? node.absoluteBoundingBox;
             if (bounds && bounds.width > 1 && bounds.height > 1) {
                 const x = Math.max(0, bounds.x - rootX);
                 const y = Math.max(0, bounds.y - rootY);
@@ -215,6 +266,12 @@ async function exportRegions(request) {
     }
 }
 figma.ui.onmessage = async (message) => {
+    if (message.type === 'GET_UI_PREFERENCES')
+        await loadUiPreferences();
+    if (message.type === 'SAVE_UI_PREFERENCES')
+        await saveUiPreferences(message.panelRatio);
+    if (message.type === 'UI_RESIZE')
+        resizeUi(message.width, message.height);
     if (message.type === 'PREPARE_KLAVIYO_EXPORT') {
         figma.notify('Klaviyo table export data prepared.');
     }

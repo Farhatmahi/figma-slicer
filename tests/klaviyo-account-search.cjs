@@ -64,7 +64,6 @@ assert.equal(builtUi, fs.readFileSync(path.join(root, 'src/ui.html'), 'utf8'), '
     });
     await page.goto('https://plugin.test/');
     await page.evaluate(() => {
-      document.documentElement.style.cssText = '--figma-color-bg:#222;--figma-color-bg-secondary:#383838;--figma-color-text:#eee;--figma-color-text-secondary:#aaa;--figma-color-border:#555';
       window.selectionChanges = 0;
       document.getElementById('klaviyoAccount').addEventListener('change', () => window.selectionChanges++);
       // Use the plugin's normal host message to reveal the workspace, not CSS overrides.
@@ -80,6 +79,7 @@ assert.equal(builtUi, fs.readFileSync(path.join(root, 'src/ui.html'), 'utf8'), '
     const refresh = page.locator('#refreshAccounts');
     const rows = page.locator('#klaviyoAccountOptions [role=option]');
     const popup = page.locator('#klaviyoAccountDropdown');
+    const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const waitForRows = count => page.waitForFunction(expected => document.querySelectorAll('#klaviyoAccountOptions [role=option]').length === expected, count);
     await trigger.waitFor({ state: 'visible' });
     await trigger.scrollIntoViewIfNeeded();
@@ -197,19 +197,24 @@ assert.equal(builtUi, fs.readFileSync(path.join(root, 'src/ui.html'), 'utf8'), '
     assert.equal(createBody.slices.length, 1);
 
     // Panel contains its search above a scrollable list in both opening directions and themes.
-    for (const [width, height, background, foreground] of [[700, 840, '#222', '#eee'], [360, 500, '#fff', '#222']]) {
+    for (const [width, height, colorScheme] of [[700, 840, 'dark'], [360, 500, 'light']]) {
       await page.setViewportSize({ width, height });
-      await page.evaluate(({ background, foreground }) => {
-        document.documentElement.style.setProperty('--figma-color-bg', background);
-        document.documentElement.style.setProperty('--figma-color-text', foreground);
-      }, { background, foreground });
+      await page.emulateMedia({ colorScheme });
+      await settle();
+      const overflow = await page.evaluate(() => {
+        const workspace = document.getElementById('workspace');
+        return { document: document.documentElement.scrollWidth > innerWidth + 1, workspace: workspace.scrollWidth > workspace.clientWidth + 1 };
+      });
+      assert.deepEqual(overflow, { document: false, workspace: false }, 'Neither the document nor workspace overflows horizontally');
       for (const direction of ['below', 'above']) {
         await trigger.scrollIntoViewIfNeeded();
         await page.evaluate(direction => {
           const rect = document.getElementById('klaviyoAccountTrigger').getBoundingClientRect();
-          const desiredTop = direction === 'below' ? 100 : window.innerHeight - rect.height - 12;
-          window.scrollBy(0, rect.top - desiredTop);
+          const workspace = document.getElementById('workspace'), viewport = workspace.getBoundingClientRect();
+          const desiredTop = direction === 'below' ? viewport.top + 24 : viewport.bottom - rect.height - 12;
+          workspace.scrollBy(0, rect.top - desiredTop);
         }, direction);
+        await settle();
         assert(!(await search.isVisible()));
         await trigger.click();
         await waitForRows(81);
@@ -218,7 +223,7 @@ assert.equal(builtUi, fs.readFileSync(path.join(root, 'src/ui.html'), 'utf8'), '
         assert(box.x >= 0 && box.y >= 0 && box.x + box.width <= width && box.y + box.height <= height, 'Dropdown stays inside plugin window');
         assert(inputBox.x >= box.x && inputBox.y >= box.y && inputBox.x + inputBox.width <= box.x + box.width && inputBox.y + inputBox.height <= listBox.y, 'Search remains inside top of panel');
         if (direction === 'below') assert(box.y >= anchor.y + anchor.height, 'Dropdown opens below selector with room');
-        else assert(box.y + box.height <= anchor.y, 'Dropdown opens above selector near bottom');
+        else assert(box.y + box.height <= anchor.y, `Dropdown opens above selector near bottom: ${JSON.stringify({ width, height, box, anchor })}`);
         assert(await page.locator('#klaviyoAccountOptions').evaluate(el => el.scrollHeight > el.clientHeight), '81 results scroll within popup');
         await search.press('Escape');
         assert(!(await search.isVisible()));
