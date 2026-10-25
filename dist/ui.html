@@ -206,16 +206,22 @@
     .format-note { font-size: 11px; color: var(--ii-muted); }
     .prepare-action, .create-action { width: 100%; margin-top: 12px; }
     .create-action { min-height: 40px; }
-    .result-card { margin-top: 12px; padding: 12px; border: 1px solid var(--ii-border); border-radius: 6px; background: var(--ii-surface); }
     .result-title { font-size: 12px; font-weight: 600; }
     .status-note { margin-top: 6px; font-size: 11px; color: var(--ii-muted); overflow-wrap: anywhere; }
     .result-actions { display: flex; gap: 8px; margin-top: 8px; }
     .result-actions button { font-size: 11px; }
-    .success-result { border-color: #abefc6; background: #f6fef9; }
     .debug-details { margin-top: 8px; }
     .debug-details textarea { min-height: 100px; margin-top: 8px; font: 11px/1.5 ui-monospace, monospace; }
-    .operation-status { min-height: 18px; margin-top: 8px; font-size: 11px; color: var(--ii-muted); }
-    .is-busy .operation-status::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border: 2px solid #bae9fa; border-top-color: #008bbf; border-radius: 50%; animation: spin .9s linear infinite; }
+    .operation-status { min-width: 0; margin-top: 12px; padding: 12px; border: 1px solid var(--ii-border); border-radius: 6px; background: var(--ii-surface); font-size: 11px; color: var(--ii-text); overflow-wrap: anywhere; }
+    .operation-status[data-state=success], .operation-status[data-state=ready] { border-color: #abefc6; background: #f6fef9; }
+    .operation-status[data-state=error] { border-color: #fecdca; background: #fff7f6; }
+    .operation-status:is([data-state=preparing], [data-state=creating])::before { content: ''; float: left; width: 10px; height: 10px; margin: 2px 6px 0 0; border: 2px solid #bae9fa; border-top-color: #008bbf; border-radius: 50%; animation: spin .9s linear infinite; }
+    #operationProgress { width: 100%; height: 6px; margin-top: 10px; accent-color: var(--ii-accent); }
+    .operation-facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 5px 10px; margin: 10px 0 0; }
+    .operation-facts dt { color: var(--ii-muted); }
+    .operation-facts dd { margin: 0; text-align: right; }
+    .technical-details { margin-top: 12px; font-size: 11px; }
+    .debug-result { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--ii-border); }
     @keyframes spin { to { transform: rotate(360deg); } }
     .toast-region { flex: none; width: 100%; max-height: 26vh; overflow-y: auto; display: grid; gap: 8px; padding: 8px 20px; background: var(--ii-canvas); border-top: 1px solid var(--ii-border); }
     .toast-region:empty { display: none; }
@@ -364,42 +370,29 @@
             <div class="card-body">
               <button id="prepareKlaviyo" class="secondary prepare-action">Prepare &amp; upload images</button>
               <button id="createKlaviyoTemplate" class="primary create-action" disabled>Create Klaviyo template</button>
-              <div id="operationStatus" class="operation-status" role="status">Create becomes available after the images are prepared.</div>
-          <div id="klaviyoPayloadBox" class="result-card" style="display:none;">
-            <div class="result-title">Preparing images</div>
-            <div class="status-note">The plugin is exporting, compressing, and uploading the reviewed slices.</div>
-            <div class="result-actions">
-              <button id="copyKlaviyoJson">Copy debug data</button>
-            </div>
-            <div id="uploadStatus" class="status-note"></div>
-            <details class="debug-details">
-              <summary>View prepared JSON</summary>
-              <textarea id="klaviyoJson" readonly></textarea>
-            </details>
-          </div>
-
-          <div id="backendResultBox" class="result-card" style="display:none;">
-            <div class="result-title">Images ready</div>
-            <div class="status-note">The images are compressed and uploaded. Create the Klaviyo template when ready.</div>
-            <div class="result-actions">
-              <button id="copyBackendResult">Copy debug result</button>
-            </div>
-            <div id="klaviyoCreateStatus" class="status-note"></div>
-            <details class="debug-details">
-              <summary>View upload result</summary>
-              <textarea id="backendResult" readonly></textarea>
-            </details>
-          </div>
-
-          <div id="klaviyoCreateResultBox" class="result-card success-result" style="display:none;">
-            <div class="result-title">Template created successfully</div>
-            <div class="status-note">The template is now available in the selected Klaviyo account.</div>
-            <div class="result-actions"><button id="copyKlaviyoCreateResult">Copy template result</button></div>
-            <details class="debug-details">
-              <summary>View template result</summary>
-              <textarea id="klaviyoCreateResult" readonly></textarea>
-            </details>
-          </div>
+              <div id="operationStatus" class="operation-status" role="status" aria-live="polite" data-state="idle">
+                <div id="operationTitle" class="result-title">Ready to prepare images</div>
+                <div id="operationMessage" class="status-note">Create becomes available after the images are prepared.</div>
+                <progress id="operationProgress" aria-label="Image preparation progress" hidden></progress>
+                <dl id="operationFacts" class="operation-facts" hidden></dl>
+              </div>
+              <details id="technicalDetails" class="debug-details technical-details">
+                <summary>Technical details</summary>
+                <div id="klaviyoPayloadBox" class="debug-result" style="display:none;">
+                  <div class="result-actions"><button id="copyKlaviyoJson">Copy debug data</button></div>
+                  <details class="debug-details"><summary>View prepared JSON</summary><textarea id="klaviyoJson" readonly></textarea></details>
+                </div>
+                <div id="backendResultBox" class="debug-result" style="display:none;">
+                  <div class="result-actions"><button id="copyBackendResult">Copy upload results</button></div>
+                  <details class="debug-details"><summary>View upload results</summary><textarea id="backendResult" readonly></textarea></details>
+                </div>
+                <div id="klaviyoCreateResultBox" class="debug-result" style="display:none;">
+                  <div class="result-actions"><button id="copyKlaviyoCreateResult">Copy template results</button></div>
+                  <details class="debug-details"><summary>View template results</summary><textarea id="klaviyoCreateResult" readonly></textarea></details>
+                </div>
+              </details>
+              <div id="uploadStatus" hidden></div>
+              <div id="klaviyoCreateStatus" hidden></div>
 
 
             </div>
@@ -589,6 +582,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   function snapshot() {
     state.klaviyoFiles = [];
     state.preparedBackendResult = null;
+    resetTemplateOperation();
     state.history.push(JSON.stringify({
       horizontalCuts: state.horizontalCuts,
       verticalCutsBySection: state.verticalCutsBySection,
@@ -859,6 +853,56 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return payload;
   }
 
+  // Presentation only: API payloads and operation flags remain authoritative.
+  let templateOperation = { phase: 'idle', message: 'Create becomes available after the images are prepared.', facts: [], progress: null };
+
+  function preparedImageFacts(prepared = state.preparedBackendResult) {
+    const slices = prepared && Array.isArray(prepared.slices) ? prepared.slices : [];
+    const facts = slices.length ? [['Uploaded slices', String(slices.length)]] : [];
+    const hasSizes = slices.length && slices.every(slice => Number.isFinite(slice.originalSizeBytes) && slice.originalSizeBytes >= 0 && Number.isFinite(slice.compressedSizeBytes) && slice.compressedSizeBytes >= 0);
+    if (hasSizes) {
+      const original = slices.reduce((sum, slice) => sum + slice.originalSizeBytes, 0);
+      const compressed = slices.reduce((sum, slice) => sum + slice.compressedSizeBytes, 0);
+      if (original > 0) facts.push(['Compression savings', `${Math.round((1 - compressed / original) * 100)}%`]);
+    }
+    return facts;
+  }
+
+  function setTemplateOperation(phase, message, { facts = [], progress = null } = {}) {
+    templateOperation = { phase, message, facts, progress };
+    renderTemplateOperation();
+  }
+
+  function resetTemplateOperation() {
+    if (!state.preparedBackendResult) $('createKlaviyoTemplate').disabled = true;
+    if (state.exporting || state.backendUploading || state.klaviyoCreating) return;
+    setTemplateOperation('idle', 'Create becomes available after the images are prepared.');
+  }
+
+  function renderTemplateOperation() {
+    const { phase, message, facts, progress } = templateOperation;
+    const titles = { idle: 'Ready to prepare images', preparing: 'Preparing images...', ready: 'Images ready.', creating: 'Creating template...', success: 'Template created successfully.', error: 'Could not complete the operation' };
+    $('operationStatus').dataset.state = phase;
+    $('operationStatus').setAttribute('aria-busy', String(phase === 'preparing' || phase === 'creating'));
+    $('operationTitle').textContent = titles[phase];
+    $('operationMessage').textContent = message;
+    const meter = $('operationProgress');
+    meter.hidden = !progress;
+    if (progress) {
+      meter.max = progress.total;
+      meter.value = progress.current;
+    }
+    const list = $('operationFacts');
+    list.replaceChildren();
+    list.hidden = !facts.length;
+    for (const [label, value] of facts) {
+      const term = document.createElement('dt'), detail = document.createElement('dd');
+      term.textContent = label;
+      detail.textContent = value;
+      list.append(term, detail);
+    }
+  }
+
   function normaliseBackendUrl(value) {
     return value.trim().replace(/\/+$/, '');
   }
@@ -951,9 +995,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const busy = state.exporting || state.backendUploading || state.klaviyoCreating;
       $('createStep').classList.toggle('is-busy', busy);
       $('createStep').setAttribute('aria-busy', String(busy));
-      const progress = state.klaviyoCreating ? $('klaviyoCreateStatus').textContent : state.backendUploading ? $('uploadStatus').textContent : $('status').textContent;
-      const failed = /failed|cannot reach|could not|no longer exists/i.test($('status').textContent);
-      $('operationStatus').textContent = busy ? progress : failed ? $('status').textContent : (state.preparedBackendResult ? 'Images are ready. You can create the template.' : 'Create becomes available after the images are prepared.');
+      renderTemplateOperation();
       for (const id of ['status', 'klaviyoCreateStatus']) {
         const message = $(id).textContent.trim();
         let tone = null;
@@ -961,8 +1003,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         else if (/^Done\.|^Klaviyo template created|^Downloaded|^Created “/.test(message)) tone = 'success';
         else if (/first\.|No .*available|incomplete\./i.test(message)) tone = 'warning';
         $(id).dataset.tone = tone || 'info';
-        // Prefer the detailed creation error and the single success summary.
-        if ((id === 'status' && /^Template creation failed/.test(message)) || (id === 'klaviyoCreateStatus' && tone === 'success')) continue;
+        // Template success belongs to the persistent card; keep other notices.
+        if ((id === 'status' && (/^Template creation failed/.test(message) || /^Klaviyo template created/.test(message))) || (id === 'klaviyoCreateStatus' && tone === 'success')) continue;
         if (tone && (!lastNotices.has(message) || Date.now() - lastNotices.get(message) > 10000)) {
           lastNotices.set(message, Date.now());
           showToast(message, tone);
@@ -1241,22 +1283,27 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (state.backendUploading || state.exporting || loadingFrameSwitch) return;
     if (state.frameMissing) {
       $('status').textContent = 'The working frame was deleted. Restore it or unlock and choose another frame before uploading.';
+      setTemplateOperation('error', $('status').textContent);
       return;
     }
 
     const uploadStatus = $('uploadStatus');
+    state.preparedBackendResult = null;
+    $('createKlaviyoTemplate').disabled = true;
     const payload = buildKlaviyoPayload();
     const missing = payload.slices.filter(slice => !slice.imageReady);
     if (!payload.slices.length) {
       const message = 'No slices are available to upload.';
       $('status').textContent = message;
       uploadStatus.textContent = message;
+      setTemplateOperation('error', message);
       return;
     }
     if (missing.length) {
       const message = `JPEG preparation is incomplete. ${missing.length} JPEG slice${missing.length === 1 ? ' is' : 's are'} not attached.`;
       $('status').textContent = message;
       uploadStatus.textContent = message;
+      setTemplateOperation('error', message);
       return;
     }
 
@@ -1265,6 +1312,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const message = 'Enter a backend URL beginning with http:// or https://.';
       $('status').textContent = message;
       uploadStatus.textContent = message;
+      setTemplateOperation('error', message);
       return;
     }
 
@@ -1283,7 +1331,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const uploadingMessage = `Uploading and compressing ${payload.slices.length} JPEG slices. This can take 10 to 60 seconds…`;
     $('status').textContent = uploadingMessage;
     uploadStatus.textContent = uploadingMessage;
-    $('klaviyoPayloadBox').scrollIntoView({ behavior: 'smooth', block: 'end' });
+    setTemplateOperation('preparing', uploadingMessage);
+    $('operationStatus').scrollIntoView({ behavior: 'smooth', block: 'end' });
 
     try {
       const healthController = new AbortController();
@@ -1298,6 +1347,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         throw new Error(`Backend health check returned ${healthResponse.status}`);
       }
       uploadStatus.textContent = 'Backend connected. Uploading JPEG slices…';
+      setTemplateOperation('preparing', uploadStatus.textContent);
       const response = await fetch(`${backendUrl}/api/prepare-klaviyo`, {
         method: 'POST',
         headers,
@@ -1310,20 +1360,23 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         throw new Error(detail || `Backend returned ${response.status}`);
       }
 
-      state.preparedBackendResult = result;
       $('backendResult').value = JSON.stringify(result, null, 2);
       $('backendResultBox').style.display = 'block';
+      const resultSlices = Array.isArray(result.slices) ? result.slices : [];
+      if (resultSlices.length !== payload.slices.length) {
+        throw new Error(`The upload response returned ${resultSlices.length} of ${payload.slices.length} slices. Prepare the images again before creating a template.`);
+      }
+      state.preparedBackendResult = result;
       $('createKlaviyoTemplate').disabled = false;
       $('klaviyoCreateResultBox').style.display = 'none';
-      $('backendResultBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      $('operationStatus').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-      const resultSlices = Array.isArray(result.slices) ? result.slices : [];
-      const originalBytes = resultSlices.reduce((sum, slice) => sum + (slice.originalSizeBytes || 0), 0);
-      const compressedBytes = resultSlices.reduce((sum, slice) => sum + (slice.compressedSizeBytes || 0), 0);
-      const savedPercent = originalBytes > 0 ? Math.round((1 - compressedBytes / originalBytes) * 100) : 0;
-      const successMessage = `Done. Uploaded ${resultSlices.length} slices and saved ${savedPercent}% after compression.`;
-      $('status').textContent = successMessage;
-      uploadStatus.textContent = successMessage;
+      const facts = preparedImageFacts(result);
+      const savings = facts.find(([label]) => label === 'Compression savings');
+      const message = `Done. Uploaded ${resultSlices.length} slices${savings ? ` and saved ${savings[1]} after compression` : ''}.`;
+      $('status').textContent = message;
+      uploadStatus.textContent = message;
+      setTemplateOperation('ready', 'Create the Klaviyo template when ready.', { facts });
     } catch (error) {
       let detail = error && error.message ? error.message : 'Unknown error';
       if (detail === 'Failed to fetch' || detail.includes('aborted')) {
@@ -1332,7 +1385,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const failureMessage = `Upload failed: ${detail}`;
       $('status').textContent = failureMessage;
       uploadStatus.textContent = failureMessage;
-      $('klaviyoPayloadBox').scrollIntoView({ behavior: 'smooth', block: 'end' });
+      setTemplateOperation('error', failureMessage);
+      $('operationStatus').scrollIntoView({ behavior: 'smooth', block: 'end' });
     } finally {
       state.backendUploading = false;
       $('prepareKlaviyo').disabled = state.frameMissing;
@@ -1344,6 +1398,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (state.klaviyoCreating || state.backendUploading || loadingFrameSwitch) return;
     if (state.frameMissing) {
       $('klaviyoCreateStatus').textContent = 'The working frame was deleted. Restore it or choose another working frame before creating a template.';
+      setTemplateOperation('error', $('klaviyoCreateStatus').textContent);
       return;
     }
 
@@ -1351,17 +1406,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const slices = prepared && Array.isArray(prepared.slices) ? prepared.slices : [];
     if (!slices.length) {
       $('klaviyoCreateStatus').textContent = 'Upload and compress the slices first.';
+      setTemplateOperation('error', $('klaviyoCreateStatus').textContent);
       return;
     }
 
     const backendUrl = normaliseBackendUrl($('backendUrl').value);
     if (!/^https?:\/\//i.test(backendUrl)) {
       $('klaviyoCreateStatus').textContent = 'Enter a valid backend URL first.';
+      setTemplateOperation('error', $('klaviyoCreateStatus').textContent);
       return;
     }
 
     if (!state.klaviyoAccounts.length && !state.fallbackConfigured) {
       $('klaviyoCreateStatus').textContent = 'No Klaviyo account is available. Refresh the account list first.';
+      setTemplateOperation('error', $('klaviyoCreateStatus').textContent);
       $('accountStatus').textContent = 'The backend did not return an active account or fallback account.';
       return;
     }
@@ -1369,6 +1427,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const accountId = $('klaviyoAccount').value.trim();
     if (state.klaviyoAccounts.length && !accountId) {
       $('klaviyoCreateStatus').textContent = 'Select the Klaviyo account first.';
+      setTemplateOperation('error', $('klaviyoCreateStatus').textContent);
       $('accountStatus').textContent = 'Choose which Klaviyo account should receive this template.';
       $('klaviyoAccountTrigger').focus();
       return;
@@ -1383,6 +1442,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     $('klaviyoAccount').disabled = true;
     $('refreshAccounts').disabled = true;
     $('klaviyoCreateStatus').textContent = `Creating the template in ${accountLabel}…`;
+    setTemplateOperation('creating', $('klaviyoCreateStatus').textContent, { facts: preparedImageFacts(prepared) });
 
     try {
       const response = await fetch(`${backendUrl}/api/create-klaviyo-template`, {
@@ -1414,12 +1474,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       $('klaviyoCreateStatus').textContent =
         `Created “${result.templateName}” in ${createdAccount} with ${rowCount} row${rowCount === 1 ? '' : 's'}${tableNote}.`;
       $('status').textContent = `Klaviyo template created in ${createdAccount}.`;
-      $('klaviyoCreateResultBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const facts = [['Klaviyo account', createdAccount]];
+      const templateName = result.templateName || prepared.templateName;
+      if (templateName) facts.push(['Template name', templateName]);
+      facts.push(...preparedImageFacts(prepared));
+      setTemplateOperation('success', 'The template is now available in Klaviyo.', { facts });
+      $('operationStatus').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
       let detail = error && error.message ? error.message : 'Unknown error';
       if (detail === 'Failed to fetch') detail = `Cannot reach the backend at ${backendUrl}.`;
       $('klaviyoCreateStatus').textContent = `Template creation failed: ${detail}`;
       $('status').textContent = 'Klaviyo template creation failed.';
+      setTemplateOperation('error', $('klaviyoCreateStatus').textContent);
     } finally {
       state.klaviyoCreating = false;
       $('createKlaviyoTemplate').disabled = state.frameMissing;
@@ -2219,7 +2285,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     state.exportFiles = [];
 
     // A Klaviyo preparation must use fresh JPEGs that match the current cuts.
-    if (purpose === 'klaviyo') state.klaviyoFiles = [];
+    if (purpose === 'klaviyo') {
+      state.klaviyoFiles = [];
+      state.preparedBackendResult = null;
+      $('createKlaviyoTemplate').disabled = true;
+      setTemplateOperation('preparing', 'Preparing JPEG slices, then uploading them…');
+    }
 
     setExportControlsDisabled(true);
     $('status').textContent = purpose === 'klaviyo'
@@ -2330,6 +2401,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         state.klaviyoFiles = [];
         state.exportFiles = [];
         state.preparedBackendResult = null;
+        resetTemplateOperation();
+        $('technicalDetails').open = false;
         state.sliceUrlOverrides = {};
         state.altSelections = {};
         state.altCtaBySlice = {};
@@ -2397,7 +2470,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       preview.src = state.previewUrl;
     }
 
-    if (message.type === 'EXPORT_PROGRESS') $('status').textContent = `Creating JPEG ${message.current} of ${message.total}…`;
+    if (message.type === 'EXPORT_PROGRESS') {
+      $('status').textContent = `Creating JPEG ${message.current} of ${message.total}…`;
+      if (state.exportPurpose === 'klaviyo') {
+        const progress = Number.isFinite(message.current) && Number.isFinite(message.total) && message.total > 0
+          ? { current: Math.max(0, Math.min(message.total, message.current)), total: message.total } : null;
+        setTemplateOperation('preparing', $('status').textContent, { progress });
+      }
+    }
 
     if (message.type === 'EXPORTED_FILE') {
       const file = { filename: message.filename, bytes: message.bytes };
@@ -2408,8 +2488,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
 
     if (message.type === 'EXPORT_COMPLETE') {
+      const preparingTemplate = state.exportPurpose === 'klaviyo';
       try {
-        if (state.exportPurpose === 'klaviyo') {
+        if (preparingTemplate) {
           state.exporting = false;
           state.exportPurpose = null;
           state.exportFiles = [];
@@ -2423,6 +2504,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         }
       } catch (error) {
         $('status').textContent = `Export failed: ${error && error.message ? error.message : 'Unknown error'}`;
+        if (preparingTemplate) setTemplateOperation('error', $('status').textContent);
       } finally {
         state.exporting = false;
         state.exportPurpose = null;
@@ -2432,6 +2514,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
 
     if (message.type === 'EXPORT_ERROR') {
+      if (state.exportPurpose === 'klaviyo') setTemplateOperation('error', message.message);
       state.exporting = false;
       state.exportPurpose = null;
       state.exportFiles = [];
@@ -2461,6 +2544,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   $('excludeAfterLastCut').onchange = () => {
     state.klaviyoFiles = [];
     state.preparedBackendResult = null;
+    resetTemplateOperation();
     render();
   };
 
@@ -2492,7 +2576,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     $('accountStatus').textContent = state.selectedKlaviyoAccountId
       ? `Selected: ${selectedAccountLabel()}`
       : 'Select the Klaviyo account for this template.';
-    $('klaviyoCreateResultBox').style.display = 'none';
   };
   $('backendUrl').addEventListener('change', () => loadKlaviyoAccounts(false));
   $('backendToken').addEventListener('change', () => loadKlaviyoAccounts(false));

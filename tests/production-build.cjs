@@ -23,7 +23,7 @@ const expectedController = ts.transpileModule(read('src/code.ts'), {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None, strict: true }
 }).outputText;
 assert.equal(controller, expectedController, 'Production controller is stale: run npm run build');
-for (const id of ['pluginVersion', 'previewPanel', 'workflowPanel', 'frameStep', 'sliceStep', 'reviewStep', 'klaviyoPanel', 'createStep', 'klaviyoAccountTrigger', 'klaviyoAccountSearch']) {
+for (const id of ['pluginVersion', 'previewPanel', 'workflowPanel', 'frameStep', 'sliceStep', 'reviewStep', 'klaviyoPanel', 'createStep', 'operationStatus', 'operationTitle', 'technicalDetails', 'klaviyoAccountTrigger', 'klaviyoAccountSearch']) {
   assert(html.includes(`id="${id}"`), `Missing built v12 component: ${id}`);
 }
 assert.equal((html.match(/class="card workflow-step"/g) || []).length, 5);

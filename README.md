@@ -18,7 +18,7 @@ Use the header's workspace toggle or the bottom-right window grip to resize the 
 2. Use Horizontal mode to add rows, then split a row into 2 columns, 3 columns, or custom columns. Click guides to remove them; Undo and Reset retain their existing behavior. Numbered preview labels open that slice's content review.
 3. Review text inclusion, the optional CTA, final alt text, and each slice's destination URL. Next/Previous, slice chips and the jump selector locate the active slice in the email preview. Click the **Slice N of M** indicator to locate it again without changing any edits. Fitting slices are centered; tall slices align near the top. Only the preview scrolls, using smooth motion unless reduced motion is enabled. Select All, Clear, text Copy, default URL, and “No CTA divider” remain available. Expand **Slice preview & location** for the original crop and email map.
 4. Choose a Klaviyo account with the searchable dropdown. Search appears inside the panel only, resets on opening, and uses the already loaded account list. Refresh retains a still-valid selected account ID. Advanced settings retain the backend URL/token, automatic export scale, and JPEG ZIP download.
-5. **Prepare & upload images**, then **Create Klaviyo template**. Preparation, compression/upload, and creation remain separate operations with their existing validation, progress messages, and debug results. Full-width JPEG export remains 1200 px.
+5. **Prepare & upload images**, then **Create Klaviyo template**. One compact status card shows the current operation, available JPEG progress, upload readiness, creation success, or an actionable error. Counts and compression savings come from actual upload results; completed template details retain the account and name used for that operation. Expand **Technical details** for all prepared JSON, upload results, template results, and copy controls. The specific template-success toast is removed; warning/error notifications remain. Full-width JPEG export remains 1200 px. See [status verification](docs/template-status.md).
 
 Existing session behavior and credential handling are unchanged. Panel proportions are no longer persisted.
 
@@ -59,6 +59,7 @@ node tests/working-frame-lock.cjs
 node tests/working-frame-authority.cjs
 node tests/ui-preferences.cjs
 node tests/compact-workspace.cjs
+node tests/unified-status.cjs
 ```
 
 `verify:production` checks that both built entry points exactly match their sources, the Figma menu and UI identify v12.0, and the compiled controller opens at 560 × 840. The workflow browser test takes its initial viewport from the **actual built controller's `showUI` call**, rather than assuming a wide window. The compact-workspace comparison uses the immutable production UI at commit `e30d0f3` as its baseline, so run it from a Git checkout containing that commit's history. It verifies the entire window reduction comes from the preview, the editor keeps its width, retired divider preferences have no effect, and preview interactions and narrow layouts remain usable.
