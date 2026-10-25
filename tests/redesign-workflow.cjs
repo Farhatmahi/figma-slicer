@@ -21,7 +21,7 @@ vm.runInNewContext(fs.readFileSync(path.join(root, manifest.main), 'utf8'), {
     currentPage: { selection: [] }, ui: { postMessage() {} }, on() {}
   }
 });
-assert(launchOptions && launchOptions.width >= 840, 'Actual controller launch must expose the v12 two-panel workspace');
+assert(launchOptions && launchOptions.width >= 780, 'Actual controller launch must expose the compact two-panel workspace');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
@@ -273,7 +273,7 @@ assert(launchOptions && launchOptions.width >= 840, 'Actual controller launch mu
       assert(layout.scrollWidth <= layout.innerWidth + 1, `No horizontal document overflow at ${width}×${height}`);
       assert(await page.locator('#pluginVersion').isVisible(), 'Running UI version remains discoverable at every window width');
       assert(layout.workspaceScrollWidth <= layout.workspaceWidth + 1, `No horizontal workflow overflow at ${width}×${height}`);
-      if (width < 840) assert(layout.previewBottom <= layout.workflowTop + 1, 'Narrow view stacks preview above controls');
+      if (width < 780) assert(layout.previewBottom <= layout.workflowTop + 1, 'Narrow view stacks preview above controls');
       else assert(layout.previewRight <= layout.workflowLeft + 1, 'Usable widths retain two columns');
       await page.locator('#createStep').scrollIntoViewIfNeeded();
       assert(await page.locator('#createStep').isVisible(), 'The final action area remains reachable by scrolling');

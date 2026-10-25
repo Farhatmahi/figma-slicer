@@ -58,7 +58,7 @@
     #workspace { display: none; flex: 1; min-height: 0; padding: 0 20px 20px; overflow-y: auto; }
     .workspace-layout { display: flex; align-items: flex-start; min-width: 0; }
     #previewPanel { flex: 0 0 var(--preview-width, var(--preview-ratio)); min-width: 260px; position: sticky; top: 0; min-height: 0; }
-    #workflowPanel { flex: 1 1 0; min-width: 400px; }
+    #workflowPanel { flex: 1 1 0; min-width: 320px; }
     #panelDivider { flex: 0 0 16px; align-self: stretch; min-height: 120px; padding: 0; border: 0; border-radius: 0; background: transparent; cursor: col-resize; touch-action: none; position: relative; }
     #panelDivider::before { content: ''; position: absolute; left: 7px; width: 2px; top: 12px; bottom: 12px; background: var(--ii-border); border-radius: 2px; }
     #panelDivider:hover::before, #panelDivider:focus-visible::before { background: var(--ii-accent); }
@@ -91,11 +91,11 @@
     .review-highlight { position: absolute; z-index: 2; pointer-events: none; border: 2px solid #00a5dc; background: rgb(0 184 245 / 8%); box-shadow: inset 0 0 0 1px white; }
     /* One uninterrupted workflow; sections are not navigation gates. */
     .card { background: var(--ii-bg); border: 1px solid var(--ii-border); border-radius: var(--ii-radius); margin-bottom: 12px; min-width: 0; box-shadow: var(--ii-shadow); overflow: hidden; }
-    .card-head { display: flex; align-items: center; gap: 10px; padding: 16px; border-bottom: 1px solid #f0f2f5; }
+    .card-head { display: flex; align-items: center; gap: 8px; padding: 12px; border-bottom: 1px solid #f0f2f5; }
     .card-number { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; border: 1px solid #cceefb; border-radius: 6px; color: #006b95; background: var(--ii-accent-soft); font-size: 12px; font-weight: 650; }
     .card-title { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.2px; }
     .card-subtitle { font-size: 11px; color: var(--ii-muted); margin-top: 3px; }
-    .card-body { padding: 16px; }
+    .card-body { padding: 12px; }
     .card-head-actions { margin-left: auto; }
     .card-head-actions button { min-height: 30px; padding: 0 8px; font-size: 11px; }
     .selected-frame { display: flex; align-items: center; gap: 12px; }
@@ -107,9 +107,9 @@
     .frame-actions { display: flex; align-items: center; gap: 8px; flex: none; }
     #frameLockBtn { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 8px; font-size: 11px; }
     #frameLockBtn[aria-pressed=true] { border-color: #b8e6f6; background: var(--ii-accent-soft); color: #006b95; }
-    .frame-lock-status { padding: 0 16px 12px; color: var(--ii-muted); font-size: 11px; overflow-wrap: anywhere; }
+    .frame-lock-status { padding: 0 12px 12px; color: var(--ii-muted); font-size: 11px; overflow-wrap: anywhere; }
     .frame-lock-status[data-missing=true] { color: var(--ii-error); }
-    .frame-selection-action { padding: 0 16px 12px; }
+    .frame-selection-action { padding: 0 12px 12px; }
     .frame-selection-action button { min-height: 30px; font-size: 11px; }
     .frame-switch-dialog { max-width: min(420px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--ii-border); border-radius: 8px; color: var(--ii-text); background: var(--ii-bg); box-shadow: 0 12px 40px rgb(16 24 40 / 18%); }
     .frame-switch-dialog::backdrop { background: rgb(16 24 40 / 35%); }
@@ -127,11 +127,11 @@
     .field > span { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 550; }
     .field-help { margin-top: 6px; color: var(--ii-muted); font-size: 11px; }
     .field-grid, .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .review-global-settings { padding: 12px 16px; background: var(--ii-surface); border-bottom: 1px solid var(--ii-border); }
+    .review-global-settings { padding: 12px; background: var(--ii-surface); border-bottom: 1px solid var(--ii-border); }
     .text-slices { min-width: 0; }
     .review-workspace { display: flex; flex-direction: column; }
     .review-editor { min-width: 0; }
-    .review-toolbar { padding: 12px 16px; border-bottom: 1px solid var(--ii-border); background: var(--ii-bg); }
+    .review-toolbar { padding: 12px; border-bottom: 1px solid var(--ii-border); background: var(--ii-bg); }
     .review-nav { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 8px; align-items: center; }
     .review-nav button { padding: 0 8px; font-size: 11px; }
     .review-current-slice { position: relative; display: flex; min-width: 0; }
@@ -147,7 +147,7 @@
     .review-slice-chip { min-width: 28px; min-height: 26px; padding: 0 6px; font-size: 11px; }
     .review-slice-chip.current { background: var(--ii-accent-soft); border-color: #79d6f3; color: #006b95; }
     .review-slice-chip.done::after { content: ' ✓'; color: var(--ii-success); }
-    .review-editor-body { padding: 16px; }
+    .review-editor-body { padding: 12px; }
     .text-slice-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
     .text-slice-title button { min-height: 26px; padding: 0 6px; font-size: 10px; }
     .text-slice-title button:first-of-type { margin-left: auto; }
@@ -170,7 +170,7 @@
     .review-bottom-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
     .review-bottom-nav button { font-size: 11px; }
     .empty-text { padding: 16px; font-size: 12px; color: var(--ii-muted); }
-    .review-context { border-top: 1px solid var(--ii-border); padding: 12px 16px; background: var(--ii-surface); }
+    .review-context { border-top: 1px solid var(--ii-border); padding: 12px; background: var(--ii-surface); }
     .review-context-sticky { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; padding-top: 12px; }
     .review-slice-kicker, .review-slice-heading, .review-map-label { grid-column: 1 / -1; margin: 0; font-size: 11px; font-weight: 550; color: var(--ii-muted); }
     .review-slice-heading { display: flex; align-items: center; gap: 6px; color: var(--ii-text); }
@@ -229,13 +229,12 @@
     .toast p { margin: 0; flex: 1; overflow-wrap: anywhere; }
     .toast button { min-height: 24px; padding: 0 5px; border: 0; }
     #windowResizeHandle { position: fixed; bottom: 0; right: 0; width: 20px; height: 20px; min-height: 20px; padding: 0; border: 0; border-radius: 0; background: linear-gradient(135deg, transparent 55%, #98a2b3 56%, #98a2b3 60%, transparent 61%, transparent 72%, #98a2b3 73%, #98a2b3 77%, transparent 78%); cursor: nwse-resize; touch-action: none; z-index: 70; }
-    @media (max-width: 839px) {
-      .workspace-layout { display: flex; flex-direction: column; gap: 20px; }
-      #previewPanel { flex: none; width: 100%; min-width: 0; position: static; }
-      #workflowPanel { width: 100%; min-width: 0; }
-      #panelDivider { display: none; }
-      #previewWrap { max-height: min(440px, 60vh); }
-    }
+    /* The threshold also accounts for a restored, wider preview preference. */
+    .workspace-layout.is-stacked { flex-direction: column; gap: 20px; }
+    .workspace-layout.is-stacked #previewPanel { flex: none; width: 100%; min-width: 0; position: static; }
+    .workspace-layout.is-stacked #workflowPanel { width: 100%; min-width: 0; }
+    .workspace-layout.is-stacked #panelDivider { display: none; }
+    .workspace-layout.is-stacked #previewWrap { max-height: min(440px, 60vh); }
     @media (max-width: 479px) {
       .app-header { padding: 12px; gap: 8px; }
       .brand-title { font-size: 15px; }
@@ -481,6 +480,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   const canvas = $('canvas');
   const preview = $('preview');
   const previewWrap = $('previewWrap');
+  // Legacy 1100 px window: 40 px outer padding and a 16 px divider.
+  let referencePanelSpace = 1044;
+  let workspaceScrollbarWidth = 0;
+  let preferredPreviewPanelWidth = referencePanelSpace * .38;
+  let preparePreviewLayout = () => {};
+  let calibratePreviewReference = () => {};
+  function referencePreviewFitWidth(panelWidth = preferredPreviewPanelWidth) {
+    const viewportChrome = previewWrap.offsetWidth ? previewWrap.offsetWidth - previewWrap.clientWidth : 2;
+    return Math.min(590, state.frame.width, Math.max(1, Math.round(panelWidth - viewportChrome) - 32));
+  }
   let reviewContextOpen = false;
   let pendingFrameSwitch = null;
   let loadingFrameSwitch = null;
@@ -648,6 +657,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   function fitPreview() {
     if (!state.frame) return;
+    // Fit is an explicit zoom action; resizing the window never changes scale.
+    state.fitWidth = Math.min(590, state.frame.width, Math.max(1, previewWrap.clientWidth - 32));
     state.zoom = 1;
     applyZoom(1);
     requestAnimationFrame(() => { previewWrap.scrollLeft = 0; previewWrap.scrollTop = 0; });
@@ -873,24 +884,38 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     let panelRatio = 0.38;
     let layoutTouched = false;
     let geometryFrame = 0;
-    const wide = () => window.innerWidth >= 840;
+    let windowSizeTouched = false;
+    let initialPreferencesApplied = false;
+    let openingFrameMeasured = false;
+    let lastOpeningWidth = 800;
+    let calibrationVersion = 0;
+    const COMPACT_WINDOW_WIDTH = 800;
+    const MIN_WORKFLOW_WIDTH = 320;
+    const minimumSplitWidth = () => Math.max(780, Math.ceil(preferredPreviewPanelWidth + MIN_WORKFLOW_WIDTH + 56 + workspaceScrollbarWidth));
+    const wide = () => window.innerWidth >= minimumSplitWidth();
     const post = message => parent.postMessage({ pluginMessage: message }, '*');
 
     function applyPanelRatio() {
+      const workspace = $('workspace');
+      workspaceScrollbarWidth = Math.max(0, workspace.offsetWidth - workspace.clientWidth);
+      referencePanelSpace = 1044 - workspaceScrollbarWidth;
+      preferredPreviewPanelWidth = Math.max(260, referencePanelSpace * panelRatio);
+      layout.classList.toggle('is-stacked', !wide());
       if (!wide() || !layout.clientWidth) return;
-      const available = layout.clientWidth - divider.offsetWidth;
-      const left = Math.max(260, Math.min(available - 400, available * panelRatio));
+      const available = layout.clientWidth - 16;
+      const left = preferredPreviewPanelWidth;
       layout.style.setProperty('--preview-width', `${left}px`);
       layout.style.setProperty('--preview-ratio', `${panelRatio * 100}%`);
       divider.setAttribute('aria-valuenow', String(Math.round(left / available * 100)));
-      divider.setAttribute('aria-valuemin', String(Math.ceil(Math.max(.25, 260 / available) * 100)));
-      divider.setAttribute('aria-valuemax', String(Math.floor(Math.min(.60, (available - 400) / available) * 100)));
+      divider.setAttribute('aria-valuemin', String(Math.ceil(260 / available * 100)));
+      divider.setAttribute('aria-valuemax', String(Math.ceil(Math.min(referencePanelSpace * .6, available - MIN_WORKFLOW_WIDTH) / available * 100)));
     }
 
     function changeRatio(value, save = false) {
-      const available = layout.clientWidth - divider.offsetWidth;
-      const min = Math.max(.25, 260 / available);
-      const max = Math.min(.60, (available - 400) / available);
+      calibrationVersion += 1;
+      const available = layout.clientWidth - 16;
+      const min = Math.max(.25, 260 / referencePanelSpace);
+      const max = Math.min(.60, (available - MIN_WORKFLOW_WIDTH) / referencePanelSpace);
       panelRatio = Math.max(min, Math.min(max, value));
       layoutTouched = true;
       applyPanelRatio();
@@ -901,15 +926,39 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       cancelAnimationFrame(geometryFrame);
       geometryFrame = requestAnimationFrame(() => {
         applyPanelRatio();
-        if (!state.frame || previewWrap.clientWidth < 1) return;
-        const fitWidth = Math.min(590, state.frame.width, Math.max(1, previewWrap.clientWidth - 32));
-        if (Math.abs(fitWidth - state.fitWidth) > .5) {
-          state.fitWidth = fitWidth;
-          // Reuses rendering/coordinate conversion, never the cut snapshot path.
-          applyZoom(state.zoom);
-        }
+        // Viewport/divider resizing must not change image width, zoom or cuts.
       });
     }
+
+    function fitOpeningWindow() {
+      if (!windowSizeTouched && !layoutTouched && [COMPACT_WINDOW_WIDTH, lastOpeningWidth].includes(window.innerWidth) && minimumSplitWidth() > window.innerWidth) {
+        lastOpeningWidth = minimumSplitWidth();
+        post({ type: 'UI_RESIZE', width: lastOpeningWidth, height: window.innerHeight });
+      }
+    }
+    preparePreviewLayout = () => {
+      applyPanelRatio();
+      if (!openingFrameMeasured) {
+        fitOpeningWindow();
+        openingFrameMeasured = true;
+      }
+    };
+    calibratePreviewReference = () => {
+      const version = ++calibrationVersion;
+      const referencePanelWidth = preferredPreviewPanelWidth;
+      let remainingFrames = 4;
+      const calibrate = () => {
+        if (version !== calibrationVersion || !state.frame) return;
+        applyPanelRatio();
+        const fitWidth = referencePreviewFitWidth(referencePanelWidth);
+        if (Math.abs(fitWidth - state.fitWidth) > .5) {
+          state.fitWidth = fitWidth;
+          applyZoom(state.zoom);
+        }
+        if (--remainingFrames > 0) requestAnimationFrame(calibrate);
+      };
+      requestAnimationFrame(calibrate);
+    };
 
     let draggingDivider = false;
     divider.addEventListener('pointerdown', event => {
@@ -922,7 +971,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     divider.addEventListener('pointermove', event => {
       if (!draggingDivider) return;
       const rect = layout.getBoundingClientRect();
-      changeRatio((event.clientX - rect.left) / (layout.clientWidth - divider.offsetWidth));
+      changeRatio((event.clientX - rect.left) / referencePanelSpace);
     });
     function finishDivider(event) {
       if (!draggingDivider) return;
@@ -950,6 +999,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (message.type === 'UI_PREFERENCES' && !layoutTouched && Number.isFinite(message.panelRatio)) {
         panelRatio = Math.max(.25, Math.min(.60, message.panelRatio));
         applyPanelRatio();
+        if (!initialPreferencesApplied && state.frame) {
+          state.fitWidth = referencePreviewFitWidth();
+          applyZoom(state.zoom);
+          calibratePreviewReference();
+        }
+        // Preserve a larger legacy preview instead of squeezing it into 800 px.
+        if (!initialPreferencesApplied) fitOpeningWindow();
+        initialPreferencesApplied = true;
       }
       if (message.type === 'UI_PREFERENCES_ERROR') showToast(message.message, 'warning');
     });
@@ -959,13 +1016,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       $('wideViewBtn').setAttribute('aria-label', label);
       scheduleGeometry();
     }
-    $('wideViewBtn').onclick = () => post({ type: 'UI_RESIZE', width: wide() ? 700 : 1100, height: window.innerHeight });
+    $('wideViewBtn').onclick = () => {
+      windowSizeTouched = true;
+      post({ type: 'UI_RESIZE', width: wide() ? 700 : Math.max(COMPACT_WINDOW_WIDTH, minimumSplitWidth()), height: window.innerHeight });
+    };
     const grip = $('windowResizeHandle');
     let resizeStart = null;
     let pendingResize = 0;
     grip.addEventListener('pointerdown', event => {
       if (event.button !== 0) return;
       event.preventDefault();
+      windowSizeTouched = true;
       resizeStart = { x: event.screenX, y: event.screenY, width: window.innerWidth, height: window.innerHeight };
       grip.setPointerCapture(event.pointerId);
     });
@@ -986,6 +1047,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
       event.preventDefault();
       event.stopPropagation();
+      windowSizeTouched = true;
       post({ type: 'UI_RESIZE', width: window.innerWidth + (event.key === 'ArrowLeft' ? -32 : event.key === 'ArrowRight' ? 32 : 0), height: window.innerHeight + (event.key === 'ArrowUp' ? -32 : event.key === 'ArrowDown' ? 32 : 0) });
     });
     new ResizeObserver(scheduleGeometry).observe(previewWrap);
@@ -1130,6 +1192,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       trigger.disabled = select.disabled;
       search.disabled = select.disabled;
       $('klaviyoAccountValue').textContent = select.selectedOptions[0]?.textContent || 'Select a Klaviyo account';
+      trigger.title = $('klaviyoAccountValue').textContent;
       if (select.disabled) close();
       else if (!dropdown.hidden) renderOptions();
     }
@@ -2418,8 +2481,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       preview.onload = () => {
         if (previewRevision !== framePreviewRevision) return;
         finishFrameSwitchLoad();
+        $('workspace').style.display = 'block';
+        $('emptyWorkspace').hidden = true;
+        preparePreviewLayout();
         if (!sameFrame) {
-          state.fitWidth = Math.min(590, state.frame.width);
+          state.fitWidth = referencePreviewFitWidth();
           state.zoom = 0.5;
         }
         const width = state.fitWidth * state.zoom;
@@ -2440,6 +2506,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         $('createKlaviyoTemplate').disabled = workingFrameBusy() || state.frameMissing || !state.preparedBackendResult;
         syncWorkingFrameControls();
         render();
+        if (!sameFrame) calibratePreviewReference();
       };
       preview.onerror = () => {
         if (previewRevision !== framePreviewRevision) return;

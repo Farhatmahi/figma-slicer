@@ -50,7 +50,7 @@ function createHost() {
 
 (async () => {
   const host = createHost();
-  assert.deepEqual(clone(host.shown), [{ width: 1100, height: 840, themeColors: true }], 'v12 opens wide enough to show the split workspace');
+  assert.deepEqual(clone(host.shown), [{ width: 800, height: 840, themeColors: true }], 'Compact default keeps the existing height and preview');
   assert.equal(host.messages.at(-1).type, 'SELECTION_ERROR');
 
   await host.send({ type: 'GET_UI_PREFERENCES' });

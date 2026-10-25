@@ -4,9 +4,11 @@ Internal Figma plugin for slicing email designs and creating native Klaviyo temp
 
 ## Workspace
 
-The light workspace pairs an interactive email preview with five sections on one scrollable page: Select Frame, Slice Layout, Review Content, Klaviyo Settings, and Create Template. At widths of 840 px and above, drag the divider or focus it and use the arrow keys to adjust the panels. Double-click it to restore the 38% preview proportion. The panel proportion is saved through Figma client storage; zoom and window size are not saved.
+The light workspace pairs an interactive email preview with five sections on one scrollable page: Select Frame, Slice Layout, Review Content, Klaviyo Settings, and Create Template. In the two-panel layout, drag the divider or focus it and use the arrow keys to adjust the panels. Double-click it to restore the default preview width. The saved panel preference retains its preview width from the previous 1100 px layout; zoom and window size are not saved.
 
-The opening window is now **1100 × 840**, so the two-panel design and divider appear on launch. The earlier 700 px opening width was below the 840 px split breakpoint and always opened the stacked layout. Use the header's **Switch to compact workspace** button for a 700 px window, or drag the bottom-right window grip. The grip also supports arrow keys. Below 840 px, preview and controls stack vertically. Notifications occupy a reserved footer rather than covering controls.
+The opening window is **800 × 840**, 27.27% narrower, with the default preview viewport and image rendering size preserved. The workflow panel supplies the width reduction and has tighter padding. A larger saved preview preference can request a wider opening window to retain that preview and a usable 320 px editor. For example, the previous 50% preference needs 898 px with overlay scrollbars or 906 px with a reserved scrollbar gutter. See [the measured before/after comparison](docs/compact-workspace.md).
+
+Use the header's **Switch to compact workspace** button for a 700 px window, or drag the bottom-right window grip. The grip also supports arrow keys. Preview and controls stack vertically when there is insufficient space for the preferred preview and editor (around 780 px for the default preference, depending on scrollbar width). Resizing the window or divider changes viewport space without rescaling the image; **Fit** explicitly fits the image to the current viewport. Notifications occupy a reserved footer rather than covering controls.
 
 ## Existing workflow
 
@@ -54,8 +56,9 @@ node tests/working-frame-controller.cjs
 node tests/working-frame-lock.cjs
 node tests/working-frame-authority.cjs
 node tests/ui-preferences.cjs
+node tests/compact-workspace.cjs
 ```
 
-`verify:production` checks that both built entry points exactly match their sources, the Figma menu and UI identify v12.0, and the compiled controller opens above the split-layout breakpoint. The workflow browser test takes its initial viewport from the **actual built controller's `showUI` call**, rather than assuming a wide window.
+`verify:production` checks that both built entry points exactly match their sources, the Figma menu and UI identify v12.0, and the compiled controller opens at 800 × 840. The workflow browser test takes its initial viewport from the **actual built controller's `showUI` call**, rather than assuming a wide window. The compact-workspace comparison uses the immutable production UI at commit `8a1a235` as its baseline, so run it from a Git checkout containing that commit's history. It checks identical content and zoom across saved panel preferences and scrollbar configurations, as well as divider interaction and narrow layouts.
 
 The browser tests load the actual manifest-referenced HTML and mock Figma host messages and backend responses. The controller tests exercise the built controller in a mock Figma host. These checks do not establish live Figma document export or live backend/Klaviyo access. See [the preservation audit](docs/functional-preservation.md) for coverage and known limitations.

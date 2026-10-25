@@ -30,7 +30,7 @@ assert.equal((html.match(/class="card workflow-step"/g) || []).length, 5);
 for (const token of ['--ii-bg: #ffffff', '--ii-text: #101828', '--ii-accent: #00b8f5']) {
   assert(html.includes(token), `Missing v12 light-theme token: ${token}`);
 }
-assert(html.includes('@media (max-width: 839px)'), 'Retain compact responsive stacking');
+assert(html.includes('.workspace-layout.is-stacked') && html.includes('Math.max(780,'), 'Retain layout-dependent responsive stacking');
 assert(html.includes('id="pluginVersion"') && html.includes('>v12.0</span>'));
 
 let opening;
@@ -44,7 +44,7 @@ vm.runInNewContext(controller, {
     currentPage: { selection: [] }, ui: { postMessage() {} }, on() {}
   }
 });
-assert.equal(opening.width, 1100, 'Normal launch must be above the split-layout breakpoint');
+assert.equal(opening.width, 800, 'Compact launch preserves the preview and reduces the editor width');
 assert.equal(opening.height, 840);
 const digest = crypto.createHash('sha256').update(html).digest('hex');
 console.log(`PASS: ${manifest.name}; manifest -> ${manifest.main} + ${manifest.ui}; source/built files match; 5-step light workspace opens ${opening.width}x${opening.height}; UI SHA256 ${digest}.`);

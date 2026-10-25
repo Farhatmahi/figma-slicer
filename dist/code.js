@@ -1,6 +1,6 @@
 "use strict";
-// Open above the 840 px split-layout breakpoint so v12 is visible on launch.
-figma.showUI(__html__, { width: 1100, height: 840, themeColors: true });
+// Compact editor; the UI retains the legacy preview width and rendering scale.
+figma.showUI(__html__, { width: 800, height: 840, themeColors: true });
 const TARGET_EMAIL_EXPORT_WIDTH = 1200;
 const UI_PREFERENCES_KEY = 'inbox-slicer:ui:v12';
 const DEFAULT_PANEL_RATIO = 0.38;

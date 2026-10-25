@@ -1,5 +1,5 @@
-// Open above the 840 px split-layout breakpoint so v12 is visible on launch.
-figma.showUI(__html__, { width: 1100, height: 840, themeColors: true });
+// Compact editor; the UI retains the legacy preview width and rendering scale.
+figma.showUI(__html__, { width: 800, height: 840, themeColors: true });
 
 type Region = {
   id: string;
