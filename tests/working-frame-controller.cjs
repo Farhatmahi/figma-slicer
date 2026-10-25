@@ -267,9 +267,9 @@ const choose = async (host, ...ids) => {
   assert.equal(busy.crops.length, cropCount);
   assert.match(busy.last('EXPORT_ERROR').message, /does not match/);
   await busy.send({ type: 'GET_UI_PREFERENCES' });
-  assert.equal(busy.last('UI_PREFERENCES').panelRatio, .41);
+  assert.equal(busy.last('UI_PREFERENCES'), undefined, 'Retired divider preferences are not restored');
   await busy.send({ type: 'SAVE_UI_PREFERENCES', panelRatio: .45 });
-  assert.deepEqual(busy.writes.at(-1), { key: 'inbox-slicer:ui:v12', value: { panelRatio: .45 } });
+  assert.deepEqual(busy.writes, [], 'Retired divider preferences are not persisted');
   assert.equal(busy.selectionWrites, 0); assert.equal(busy.actualLayerLockWrites, 0);
-  console.log(`PASS: ${sourceMode ? 'source controller' : manifest.main} auto-locks stable working IDs, ignores canvas selection without touching layers, preserves refresh/cancel/delete state, guards stale renders and exports the locked frame; preferences remain compatible.`);
+  console.log(`PASS: ${sourceMode ? 'source controller' : manifest.main} auto-locks stable working IDs, ignores canvas selection without touching layers, preserves refresh/cancel/delete state, guards stale renders and exports the locked frame; retired divider preferences are ignored.`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

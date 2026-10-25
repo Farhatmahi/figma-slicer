@@ -16,7 +16,7 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
   try {
-    const page = await browser.newPage({ viewport: { width: 800, height: 840 }, reducedMotion: 'reduce', acceptDownloads: true });
+    const page = await browser.newPage({ viewport: { width: 560, height: 840 }, reducedMotion: 'reduce', acceptDownloads: true });
     page.setDefaultTimeout(7000);
     const errors = [], apiRequests = [], outbound = [], inbound = [], cloneSources = [];
     let sendController;
@@ -94,7 +94,7 @@ const clone = value => JSON.parse(JSON.stringify(value, (_, item) => ArrayBuffer
     let delivery = Promise.resolve(), exportGate = null, previewGate = null, previewGateForId = 'frame-B';
     const figma = {
       currentPage: figmaPage,
-      showUI(actualHtml, options) { assert.equal(actualHtml, html); assert.equal(options.width, 800); },
+      showUI(actualHtml, options) { assert.equal(actualHtml, html); assert.equal(options.width, 560); },
       ui: {
         postMessage(message) {
           const serial = clone(message);

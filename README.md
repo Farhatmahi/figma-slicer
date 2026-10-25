@@ -4,11 +4,13 @@ Internal Figma plugin for slicing email designs and creating native Klaviyo temp
 
 ## Workspace
 
-The light workspace pairs an interactive email preview with five sections on one scrollable page: Select Frame, Slice Layout, Review Content, Klaviyo Settings, and Create Template. In the two-panel layout, drag the divider or focus it and use the arrow keys to adjust the panels. Double-click it to restore the default preview width. The saved panel preference retains its preview width from the previous 1100 px layout; zoom and window size are not saved.
+The light workspace pairs an interactive email preview with five sections on one scrollable page: Select Frame, Slice Layout, Review Content, Klaviyo Settings, and Create Template.
 
-The opening window is **800 × 840**, 27.27% narrower, with the default preview viewport and image rendering size preserved. The workflow panel supplies the width reduction and has tighter padding. A larger saved preview preference can request a wider opening window to retain that preview and a usable 320 px editor. For example, the previous 50% preference needs 898 px with overlay scrollbars or 906 px with a reserved scrollbar gutter. See [the measured before/after comparison](docs/compact-workspace.md).
+The default window is **560 × 840**, exactly 30% narrower than the previous 800 × 840 default. The right workflow panel keeps its previous width (347.28 px with overlay scrollbars). All 240 px of removed width comes from the left preview, now 156.72 px wide. The old divider is replaced by a fixed 16 px gap, with no dragging, resize cursor, or saved divider preferences. Old saved panel settings cannot override the layout. See [the measured before/after comparison](docs/compact-workspace.md).
 
-Use the header's **Switch to compact workspace** button for a 700 px window, or drag the bottom-right window grip. The grip also supports arrow keys. Preview and controls stack vertically when there is insufficient space for the preferred preview and editor (around 780 px for the default preference, depending on scrollbar width). Resizing the window or divider changes viewport space without rescaling the image; **Fit** explicitly fits the image to the current viewport. Notifications occupy a reserved footer rather than covering controls.
+The left panel uses remaining window width, while the editor stays fixed in the horizontal layout. Panels stack when there is insufficient room for the editor and a usable 148 px preview (around 552 px total, depending on scrollbars). The zoom toolbar wraps its help text and retains all four controls. **Fit** fits the email to the current preview; manual zoom, panning, scrolling, slice highlighting, and coordinate mapping remain available. Outer window resizing never changes source-frame or export dimensions.
+
+Use the header's workspace toggle or the bottom-right window grip to resize the outer window. The grip also supports arrow keys. Window size and zoom are not saved or repeatedly reduced on subsequent launches. Notifications occupy a reserved footer rather than covering controls.
 
 ## Existing workflow
 
@@ -18,7 +20,7 @@ Use the header's **Switch to compact workspace** button for a 700 px window, or 
 4. Choose a Klaviyo account with the searchable dropdown. Search appears inside the panel only, resets on opening, and uses the already loaded account list. Refresh retains a still-valid selected account ID. Advanced settings retain the backend URL/token, automatic export scale, and JPEG ZIP download.
 5. **Prepare & upload images**, then **Create Klaviyo template**. Preparation, compression/upload, and creation remain separate operations with their existing validation, progress messages, and debug results. Full-width JPEG export remains 1200 px.
 
-Existing session behavior and credential handling are unchanged. Only panel proportions are persisted by the new UI.
+Existing session behavior and credential handling are unchanged. Panel proportions are no longer persisted.
 
 If the working frame is deleted, the plugin keeps its last preview and edits and disables export/upload/creation. Undo the deletion in Figma or refresh after restoring it; alternatively unlock and confirm a replacement frame. Working-frame locking is session-only. See [the frame-lock diagnosis](docs/working-frame-lock.md) for the history comparison and verification boundary.
 
@@ -59,6 +61,6 @@ node tests/ui-preferences.cjs
 node tests/compact-workspace.cjs
 ```
 
-`verify:production` checks that both built entry points exactly match their sources, the Figma menu and UI identify v12.0, and the compiled controller opens at 800 × 840. The workflow browser test takes its initial viewport from the **actual built controller's `showUI` call**, rather than assuming a wide window. The compact-workspace comparison uses the immutable production UI at commit `8a1a235` as its baseline, so run it from a Git checkout containing that commit's history. It checks identical content and zoom across saved panel preferences and scrollbar configurations, as well as divider interaction and narrow layouts.
+`verify:production` checks that both built entry points exactly match their sources, the Figma menu and UI identify v12.0, and the compiled controller opens at 560 × 840. The workflow browser test takes its initial viewport from the **actual built controller's `showUI` call**, rather than assuming a wide window. The compact-workspace comparison uses the immutable production UI at commit `e30d0f3` as its baseline, so run it from a Git checkout containing that commit's history. It verifies the entire window reduction comes from the preview, the editor keeps its width, retired divider preferences have no effect, and preview interactions and narrow layouts remain usable.
 
 The browser tests load the actual manifest-referenced HTML and mock Figma host messages and backend responses. The controller tests exercise the built controller in a mock Figma host. These checks do not establish live Figma document export or live backend/Klaviyo access. See [the preservation audit](docs/functional-preservation.md) for coverage and known limitations.

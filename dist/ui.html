@@ -17,7 +17,7 @@
       --figma-color-bg: var(--ii-bg); --figma-color-text: var(--ii-text);
       --figma-color-bg-secondary: var(--ii-surface); --figma-color-text-secondary: var(--ii-muted);
       --figma-color-border: var(--ii-border); --figma-color-border-brand: var(--ii-accent-strong);
-      --figma-color-icon-disabled: #d0d5dd; --preview-ratio: 38%;
+      --figma-color-icon-disabled: #d0d5dd;
       color: var(--ii-text); background: var(--ii-canvas);
     }
     * { box-sizing: border-box; }
@@ -56,26 +56,23 @@
     .empty-workspace h1 { font-size: 20px; font-weight: 650; letter-spacing: -.4px; }
     .empty-workspace p { color: var(--ii-muted); margin-bottom: 20px; }
     #workspace { display: none; flex: 1; min-height: 0; padding: 0 20px 20px; overflow-y: auto; }
-    .workspace-layout { display: flex; align-items: flex-start; min-width: 0; }
-    #previewPanel { flex: 0 0 var(--preview-width, var(--preview-ratio)); min-width: 260px; position: sticky; top: 0; min-height: 0; }
-    #workflowPanel { flex: 1 1 0; min-width: 320px; }
-    #panelDivider { flex: 0 0 16px; align-self: stretch; min-height: 120px; padding: 0; border: 0; border-radius: 0; background: transparent; cursor: col-resize; touch-action: none; position: relative; }
-    #panelDivider::before { content: ''; position: absolute; left: 7px; width: 2px; top: 12px; bottom: 12px; background: var(--ii-border); border-radius: 2px; }
-    #panelDivider:hover::before, #panelDivider:focus-visible::before { background: var(--ii-accent); }
-    body.resizing-panels { cursor: col-resize; user-select: none; }
-    .preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 12px; }
+    .workspace-layout { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+    #previewPanel { display: flex; flex-direction: column; flex: 1 1 0; min-width: 148px; position: sticky; top: 0; min-height: 0; max-height: var(--preview-height); }
+    #workflowPanel { flex: 0 0 var(--workflow-width, 347.28125px); min-width: 0; }
+    .preview-heading { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; margin: 0 0 12px; }
     .preview-heading h2 { margin: 0; font-size: 14px; font-weight: 600; }
     .preview-heading span { font-size: 11px; color: var(--ii-muted); }
-    .zoom-toolbar { display: flex; align-items: center; gap: 4px; padding: 8px; background: var(--ii-bg); border: 1px solid var(--ii-border); border-bottom: 0; border-radius: 8px 8px 0 0; }
+    .zoom-toolbar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px; background: var(--ii-bg); border: 1px solid var(--ii-border); border-bottom: 0; border-radius: 8px 8px 0 0; }
     .zoom-toolbar button { min-height: 28px; min-width: 28px; padding: 0 8px; border-color: transparent; }
-    #zoomValue { min-width: 44px; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; }
+    #zoomValue { min-width: 36px; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; }
     .zoom-hint { margin-left: auto; font-size: 10px; color: var(--ii-muted); }
-    #previewWrap { position: relative; width: 100%; max-height: max(120px, calc(100vh - 236px - var(--notification-space, 0px))); min-height: min(180px, 25vh); overflow: auto; padding: 16px 0; background: #edf0f4; border: 1px solid var(--ii-border); border-radius: 0 0 8px 8px; overscroll-behavior: contain; }
+    .is-narrow-preview .zoom-hint { flex: 0 0 100%; margin-left: 0; text-align: center; }
+    #previewWrap { position: relative; flex: 1 1 auto; width: 100%; max-height: max(120px, calc(100vh - 236px - var(--notification-space, 0px))); min-height: min(120px, 20vh); overflow: auto; padding: 16px 0; background: #edf0f4; border: 1px solid var(--ii-border); border-radius: 0 0 8px 8px; overscroll-behavior: contain; }
     #canvas { position: relative; margin: 0 auto; cursor: crosshair; background: #fff; box-shadow: 0 2px 8px rgb(16 24 40 / 10%); }
     #preview { display: block; width: 100%; height: auto; user-select: none; pointer-events: none; }
     #previewWrap.panning, #previewWrap.panning * { cursor: grabbing !important; user-select: none; }
     #previewWrap.pan-ready { cursor: grab; }
-    .preview-caption { margin: 8px 0 0; font-size: 11px; color: var(--ii-muted); }
+    .preview-caption { flex: none; margin: 8px 0 0; font-size: 11px; color: var(--ii-muted); }
     .guide-h, .guide-v { position: absolute; z-index: 3; box-shadow: 0 0 0 1px rgb(255 255 255 / 80%); }
     .guide-h { left: 0; width: 100%; height: 2px; background: #f04438; transform: translateY(-1px); cursor: pointer; }
     .guide-v { width: 2px; background: #008bbf; transform: translateX(-1px); cursor: pointer; }
@@ -229,11 +226,10 @@
     .toast p { margin: 0; flex: 1; overflow-wrap: anywhere; }
     .toast button { min-height: 24px; padding: 0 5px; border: 0; }
     #windowResizeHandle { position: fixed; bottom: 0; right: 0; width: 20px; height: 20px; min-height: 20px; padding: 0; border: 0; border-radius: 0; background: linear-gradient(135deg, transparent 55%, #98a2b3 56%, #98a2b3 60%, transparent 61%, transparent 72%, #98a2b3 73%, #98a2b3 77%, transparent 78%); cursor: nwse-resize; touch-action: none; z-index: 70; }
-    /* The threshold also accounts for a restored, wider preview preference. */
+    /* Stack when the fixed editor plus a usable preview no longer fit. */
     .workspace-layout.is-stacked { flex-direction: column; gap: 20px; }
-    .workspace-layout.is-stacked #previewPanel { flex: none; width: 100%; min-width: 0; position: static; }
-    .workspace-layout.is-stacked #workflowPanel { width: 100%; min-width: 0; }
-    .workspace-layout.is-stacked #panelDivider { display: none; }
+    .workspace-layout.is-stacked #previewPanel { flex: none; width: 100%; min-width: 0; position: static; max-height: none; }
+    .workspace-layout.is-stacked #workflowPanel { flex: none; width: 100%; min-width: 0; }
     .workspace-layout.is-stacked #previewWrap { max-height: min(440px, 60vh); }
     @media (max-width: 479px) {
       .app-header { padding: 12px; gap: 8px; }
@@ -288,7 +284,6 @@
           <div id="previewWrap"><div id="canvas"><img id="preview" alt="Selected email preview" /></div></div>
           <p class="preview-caption">Click a slice number to review. Use the layout tools to add cuts.</p>
         </aside>
-        <button id="panelDivider" type="button" role="separator" aria-label="Resize preview panel" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="60" aria-valuenow="38" title="Drag or use arrow keys to resize. Double-click to reset."></button>
         <div id="workflowPanel" aria-label="Email template workflow">
           <section id="frameStep" class="card workflow-step" aria-labelledby="frameStepTitle">
             <div class="card-head"><span class="card-number">1</span><div><h2 id="frameStepTitle" class="card-title">Select Frame</h2><div class="card-subtitle">Your selected design in Figma</div></div><div class="card-head-actions"><button id="refreshBtn" type="button">Refresh</button></div></div>
@@ -480,15 +475,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   const canvas = $('canvas');
   const preview = $('preview');
   const previewWrap = $('previewWrap');
-  // Legacy 1100 px window: 40 px outer padding and a 16 px divider.
-  let referencePanelSpace = 1044;
-  let workspaceScrollbarWidth = 0;
-  let preferredPreviewPanelWidth = referencePanelSpace * .38;
   let preparePreviewLayout = () => {};
-  let calibratePreviewReference = () => {};
-  function referencePreviewFitWidth(panelWidth = preferredPreviewPanelWidth) {
+  function initialPreviewFitWidth() {
+    // Retain the existing opening zoom scale; Fit explicitly uses the new viewport.
+    const workspace = $('workspace');
+    const gutter = workspace.offsetWidth - workspace.clientWidth;
+    const previousPanelWidth = Math.floor((1044 - gutter) * .38 * 64) / 64;
     const viewportChrome = previewWrap.offsetWidth ? previewWrap.offsetWidth - previewWrap.clientWidth : 2;
-    return Math.min(590, state.frame.width, Math.max(1, Math.round(panelWidth - viewportChrome) - 32));
+    return Math.min(590, state.frame.width, Math.max(1, Math.round(previousPanelWidth - viewportChrome) - 32));
   }
   let reviewContextOpen = false;
   let pendingFrameSwitch = null;
@@ -877,156 +871,47 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return headers;
   }
 
-  // Presentation preferences are deliberately separate from document/export state.
+  // The workflow keeps its previous default width; only the preview flexes.
   function initWorkspace() {
+    const workspace = $('workspace');
     const layout = document.querySelector('.workspace-layout');
-    const divider = $('panelDivider');
-    let panelRatio = 0.38;
-    let layoutTouched = false;
+    const DEFAULT_WINDOW_WIDTH = 560;
+    const MIN_PREVIEW_WIDTH = 148;
     let geometryFrame = 0;
-    let windowSizeTouched = false;
-    let initialPreferencesApplied = false;
-    let openingFrameMeasured = false;
-    let lastOpeningWidth = 800;
-    let calibrationVersion = 0;
-    const COMPACT_WINDOW_WIDTH = 800;
-    const MIN_WORKFLOW_WIDTH = 320;
-    const minimumSplitWidth = () => Math.max(780, Math.ceil(preferredPreviewPanelWidth + MIN_WORKFLOW_WIDTH + 56 + workspaceScrollbarWidth));
+    let workflowWidth = 347.28125;
+    let scrollbarWidth = 0;
+    const minimumSplitWidth = () => Math.ceil(workflowWidth + MIN_PREVIEW_WIDTH + 56 + scrollbarWidth);
     const wide = () => window.innerWidth >= minimumSplitWidth();
     const post = message => parent.postMessage({ pluginMessage: message }, '*');
 
-    function applyPanelRatio() {
-      const workspace = $('workspace');
-      workspaceScrollbarWidth = Math.max(0, workspace.offsetWidth - workspace.clientWidth);
-      referencePanelSpace = 1044 - workspaceScrollbarWidth;
-      preferredPreviewPanelWidth = Math.max(260, referencePanelSpace * panelRatio);
+    function applyWorkspaceLayout() {
+      scrollbarWidth = Math.max(0, workspace.offsetWidth - workspace.clientWidth);
+      // Match the browser's 1/64 px rounding in the previous 800 px layout.
+      const previousPreviewWidth = Math.floor((1044 - scrollbarWidth) * .38 * 64) / 64;
+      workflowWidth = 744 - scrollbarWidth - previousPreviewWidth;
+      layout.style.setProperty('--workflow-width', `${workflowWidth}px`);
+      layout.style.setProperty('--preview-height', `${Math.max(180, workspace.clientHeight - 20)}px`);
       layout.classList.toggle('is-stacked', !wide());
-      if (!wide() || !layout.clientWidth) return;
-      const available = layout.clientWidth - 16;
-      const left = preferredPreviewPanelWidth;
-      layout.style.setProperty('--preview-width', `${left}px`);
-      layout.style.setProperty('--preview-ratio', `${panelRatio * 100}%`);
-      divider.setAttribute('aria-valuenow', String(Math.round(left / available * 100)));
-      divider.setAttribute('aria-valuemin', String(Math.ceil(260 / available * 100)));
-      divider.setAttribute('aria-valuemax', String(Math.ceil(Math.min(referencePanelSpace * .6, available - MIN_WORKFLOW_WIDTH) / available * 100)));
-    }
-
-    function changeRatio(value, save = false) {
-      calibrationVersion += 1;
-      const available = layout.clientWidth - 16;
-      const min = Math.max(.25, 260 / referencePanelSpace);
-      const max = Math.min(.60, (available - MIN_WORKFLOW_WIDTH) / referencePanelSpace);
-      panelRatio = Math.max(min, Math.min(max, value));
-      layoutTouched = true;
-      applyPanelRatio();
-      if (save) post({ type: 'SAVE_UI_PREFERENCES', panelRatio });
-    }
-
-    function scheduleGeometry() {
-      cancelAnimationFrame(geometryFrame);
-      geometryFrame = requestAnimationFrame(() => {
-        applyPanelRatio();
-        // Viewport/divider resizing must not change image width, zoom or cuts.
-      });
-    }
-
-    function fitOpeningWindow() {
-      if (!windowSizeTouched && !layoutTouched && [COMPACT_WINDOW_WIDTH, lastOpeningWidth].includes(window.innerWidth) && minimumSplitWidth() > window.innerWidth) {
-        lastOpeningWidth = minimumSplitWidth();
-        post({ type: 'UI_RESIZE', width: lastOpeningWidth, height: window.innerHeight });
-      }
-    }
-    preparePreviewLayout = () => {
-      applyPanelRatio();
-      if (!openingFrameMeasured) {
-        fitOpeningWindow();
-        openingFrameMeasured = true;
-      }
-    };
-    calibratePreviewReference = () => {
-      const version = ++calibrationVersion;
-      const referencePanelWidth = preferredPreviewPanelWidth;
-      let remainingFrames = 4;
-      const calibrate = () => {
-        if (version !== calibrationVersion || !state.frame) return;
-        applyPanelRatio();
-        const fitWidth = referencePreviewFitWidth(referencePanelWidth);
-        if (Math.abs(fitWidth - state.fitWidth) > .5) {
-          state.fitWidth = fitWidth;
-          applyZoom(state.zoom);
-        }
-        if (--remainingFrames > 0) requestAnimationFrame(calibrate);
-      };
-      requestAnimationFrame(calibrate);
-    };
-
-    let draggingDivider = false;
-    divider.addEventListener('pointerdown', event => {
-      if (!wide() || event.button !== 0) return;
-      event.preventDefault();
-      draggingDivider = true;
-      divider.setPointerCapture(event.pointerId);
-      document.body.classList.add('resizing-panels');
-    });
-    divider.addEventListener('pointermove', event => {
-      if (!draggingDivider) return;
-      const rect = layout.getBoundingClientRect();
-      changeRatio((event.clientX - rect.left) / referencePanelSpace);
-    });
-    function finishDivider(event) {
-      if (!draggingDivider) return;
-      draggingDivider = false;
-      document.body.classList.remove('resizing-panels');
-      if (divider.hasPointerCapture(event.pointerId)) divider.releasePointerCapture(event.pointerId);
-      post({ type: 'SAVE_UI_PREFERENCES', panelRatio });
-    }
-    divider.addEventListener('pointerup', finishDivider);
-    divider.addEventListener('pointercancel', finishDivider);
-    divider.addEventListener('keydown', event => {
-      if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
-        event.preventDefault();
-        event.stopPropagation();
-        changeRatio(event.key === 'Home' ? .25 : event.key === 'End' ? .60 : panelRatio + (event.key === 'ArrowLeft' ? -.02 : .02), true);
-      }
-    });
-    divider.addEventListener('dblclick', () => {
-      changeRatio(.38, true);
-      showToast('Panel layout reset.', 'info');
-    });
-    window.addEventListener('message', event => {
-      const message = event.data && event.data.pluginMessage;
-      if (!message) return;
-      if (message.type === 'UI_PREFERENCES' && !layoutTouched && Number.isFinite(message.panelRatio)) {
-        panelRatio = Math.max(.25, Math.min(.60, message.panelRatio));
-        applyPanelRatio();
-        if (!initialPreferencesApplied && state.frame) {
-          state.fitWidth = referencePreviewFitWidth();
-          applyZoom(state.zoom);
-          calibratePreviewReference();
-        }
-        // Preserve a larger legacy preview instead of squeezing it into 800 px.
-        if (!initialPreferencesApplied) fitOpeningWindow();
-        initialPreferencesApplied = true;
-      }
-      if (message.type === 'UI_PREFERENCES_ERROR') showToast(message.message, 'warning');
-    });
-    function updateWindowAction() {
-      const label = wide() ? 'Switch to compact workspace' : 'Switch to wide workspace';
+      layout.classList.toggle('is-narrow-preview', wide() && window.innerWidth - workflowWidth - 56 - scrollbarWidth < 260);
+      const label = wide() ? 'Switch to stacked workspace' : 'Switch to two-panel workspace';
       $('wideViewBtn').title = label;
       $('wideViewBtn').setAttribute('aria-label', label);
-      scheduleGeometry();
     }
-    $('wideViewBtn').onclick = () => {
-      windowSizeTouched = true;
-      post({ type: 'UI_RESIZE', width: wide() ? 700 : Math.max(COMPACT_WINDOW_WIDTH, minimumSplitWidth()), height: window.innerHeight });
-    };
+    function scheduleGeometry() {
+      cancelAnimationFrame(geometryFrame);
+      geometryFrame = requestAnimationFrame(applyWorkspaceLayout);
+    }
+    preparePreviewLayout = applyWorkspaceLayout;
+    window.addEventListener('message', event => {
+      if (event.data?.pluginMessage?.type === 'UI_WINDOW_ERROR') showToast(event.data.pluginMessage.message, 'warning');
+    });
+    $('wideViewBtn').onclick = () => post({ type: 'UI_RESIZE', width: wide() ? 480 : DEFAULT_WINDOW_WIDTH, height: window.innerHeight });
     const grip = $('windowResizeHandle');
     let resizeStart = null;
     let pendingResize = 0;
     grip.addEventListener('pointerdown', event => {
       if (event.button !== 0) return;
       event.preventDefault();
-      windowSizeTouched = true;
       resizeStart = { x: event.screenX, y: event.screenY, width: window.innerWidth, height: window.innerHeight };
       grip.setPointerCapture(event.pointerId);
     });
@@ -1047,20 +932,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
       event.preventDefault();
       event.stopPropagation();
-      windowSizeTouched = true;
       post({ type: 'UI_RESIZE', width: window.innerWidth + (event.key === 'ArrowLeft' ? -32 : event.key === 'ArrowRight' ? 32 : 0), height: window.innerHeight + (event.key === 'ArrowUp' ? -32 : event.key === 'ArrowDown' ? 32 : 0) });
     });
-    new ResizeObserver(scheduleGeometry).observe(previewWrap);
-    new ResizeObserver(scheduleGeometry).observe(layout);
+    new ResizeObserver(scheduleGeometry).observe(workspace);
     new ResizeObserver(() => {
       const height = $('toastRegion').getBoundingClientRect().height;
       document.documentElement.style.setProperty('--notification-space', `${height}px`);
     }).observe($('toastRegion'));
-    window.addEventListener('resize', updateWindowAction);
+    window.addEventListener('resize', scheduleGeometry);
     $('emptyRefreshBtn').textContent = 'Use selected frame';
     $('emptyRefreshBtn').onclick = useSelectedCanvasFrame;
-    updateWindowAction();
-    post({ type: 'GET_UI_PREFERENCES' });
+    applyWorkspaceLayout();
 
     // Existing inline status remains authoritative; notices never replace errors.
     const lastNotices = new Map();
@@ -2485,7 +2367,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         $('emptyWorkspace').hidden = true;
         preparePreviewLayout();
         if (!sameFrame) {
-          state.fitWidth = referencePreviewFitWidth();
+          state.fitWidth = initialPreviewFitWidth();
           state.zoom = 0.5;
         }
         const width = state.fitWidth * state.zoom;
@@ -2506,7 +2388,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         $('createKlaviyoTemplate').disabled = workingFrameBusy() || state.frameMissing || !state.preparedBackendResult;
         syncWorkingFrameControls();
         render();
-        if (!sameFrame) calibratePreviewReference();
       };
       preview.onerror = () => {
         if (previewRevision !== framePreviewRevision) return;

@@ -23,14 +23,15 @@ const expectedController = ts.transpileModule(read('src/code.ts'), {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None, strict: true }
 }).outputText;
 assert.equal(controller, expectedController, 'Production controller is stale: run npm run build');
-for (const id of ['pluginVersion', 'previewPanel', 'panelDivider', 'workflowPanel', 'frameStep', 'sliceStep', 'reviewStep', 'klaviyoPanel', 'createStep', 'klaviyoAccountTrigger', 'klaviyoAccountSearch']) {
+for (const id of ['pluginVersion', 'previewPanel', 'workflowPanel', 'frameStep', 'sliceStep', 'reviewStep', 'klaviyoPanel', 'createStep', 'klaviyoAccountTrigger', 'klaviyoAccountSearch']) {
   assert(html.includes(`id="${id}"`), `Missing built v12 component: ${id}`);
 }
 assert.equal((html.match(/class="card workflow-step"/g) || []).length, 5);
 for (const token of ['--ii-bg: #ffffff', '--ii-text: #101828', '--ii-accent: #00b8f5']) {
   assert(html.includes(token), `Missing v12 light-theme token: ${token}`);
 }
-assert(html.includes('.workspace-layout.is-stacked') && html.includes('Math.max(780,'), 'Retain layout-dependent responsive stacking');
+assert(html.includes('.workspace-layout.is-stacked') && html.includes('MIN_PREVIEW_WIDTH = 148'), 'Retain usable responsive stacking');
+assert(!html.includes('id="panelDivider"') && !html.includes('SAVE_UI_PREFERENCES'), 'Remove obsolete divider controls and preferences');
 assert(html.includes('id="pluginVersion"') && html.includes('>v12.0</span>'));
 
 let opening;
@@ -44,7 +45,7 @@ vm.runInNewContext(controller, {
     currentPage: { selection: [] }, ui: { postMessage() {} }, on() {}
   }
 });
-assert.equal(opening.width, 800, 'Compact launch preserves the preview and reduces the editor width');
+assert.equal(opening.width, 560, 'Reduce the previous 800 px window by 30%, keeping the editor width');
 assert.equal(opening.height, 840);
 const digest = crypto.createHash('sha256').update(html).digest('hex');
 console.log(`PASS: ${manifest.name}; manifest -> ${manifest.main} + ${manifest.ui}; source/built files match; 5-step light workspace opens ${opening.width}x${opening.height}; UI SHA256 ${digest}.`);

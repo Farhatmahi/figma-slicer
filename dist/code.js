@@ -1,46 +1,10 @@
 "use strict";
-// Compact editor; the UI retains the legacy preview width and rendering scale.
-figma.showUI(__html__, { width: 800, height: 840, themeColors: true });
+// Reduce the previous 800 px window by 30%; keep the workflow editor width.
+figma.showUI(__html__, { width: 560, height: 840, themeColors: true });
 const TARGET_EMAIL_EXPORT_WIDTH = 1200;
-const UI_PREFERENCES_KEY = 'inbox-slicer:ui:v12';
-const DEFAULT_PANEL_RATIO = 0.38;
-let preferenceWrite = Promise.resolve();
-function validPanelRatio(value) {
-    return typeof value === 'number' && Number.isFinite(value) && value >= 0.25 && value <= 0.6;
-}
-async function loadUiPreferences() {
-    try {
-        await preferenceWrite;
-        const stored = await figma.clientStorage.getAsync(UI_PREFERENCES_KEY);
-        figma.ui.postMessage({
-            type: 'UI_PREFERENCES',
-            panelRatio: validPanelRatio(stored?.panelRatio) ? stored.panelRatio : DEFAULT_PANEL_RATIO
-        });
-    }
-    catch {
-        figma.ui.postMessage({ type: 'UI_PREFERENCES', panelRatio: DEFAULT_PANEL_RATIO });
-        figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'Panel layout could not be restored.' });
-    }
-}
-async function saveUiPreferences(panelRatio) {
-    if (!validPanelRatio(panelRatio)) {
-        figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'Invalid panel layout. Adjust the divider and try again.' });
-        return;
-    }
-    const write = preferenceWrite.then(() => figma.clientStorage.setAsync(UI_PREFERENCES_KEY, { panelRatio }));
-    // A rejected write must not block later preference changes.
-    preferenceWrite = write.catch(() => { });
-    try {
-        await write;
-        figma.ui.postMessage({ type: 'UI_PREFERENCES_SAVED', panelRatio });
-    }
-    catch {
-        figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'Panel layout could not be saved. Try adjusting the divider again.' });
-    }
-}
 function resizeUi(width, height) {
     if (typeof width !== 'number' || typeof height !== 'number' || !Number.isFinite(width) || !Number.isFinite(height)) {
-        figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'Invalid window size. Try resizing the plugin again.' });
+        figma.ui.postMessage({ type: 'UI_WINDOW_ERROR', message: 'Invalid window size. Try resizing the plugin again.' });
         return;
     }
     const nextWidth = Math.min(1600, Math.max(360, Math.round(width)));
@@ -50,7 +14,7 @@ function resizeUi(width, height) {
         figma.ui.postMessage({ type: 'UI_WINDOW_RESIZED', width: nextWidth, height: nextHeight });
     }
     catch {
-        figma.ui.postMessage({ type: 'UI_PREFERENCES_ERROR', message: 'The plugin window could not be resized. Try again.' });
+        figma.ui.postMessage({ type: 'UI_WINDOW_ERROR', message: 'The plugin window could not be resized. Try again.' });
     }
 }
 // Working identity is independent of the user's live canvas selection.
@@ -461,10 +425,6 @@ async function exportRegions(request) {
     }
 }
 figma.ui.onmessage = async (message) => {
-    if (message.type === 'GET_UI_PREFERENCES')
-        await loadUiPreferences();
-    if (message.type === 'SAVE_UI_PREFERENCES')
-        await saveUiPreferences(message.panelRatio);
     if (message.type === 'UI_RESIZE')
         resizeUi(message.width, message.height);
     if (message.type === 'PREPARE_KLAVIYO_EXPORT') {

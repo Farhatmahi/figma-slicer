@@ -21,7 +21,7 @@ vm.runInNewContext(fs.readFileSync(path.join(root, manifest.main), 'utf8'), {
     currentPage: { selection: [] }, ui: { postMessage() {} }, on() {}
   }
 });
-assert(launchOptions && launchOptions.width >= 780, 'Actual controller launch must expose the compact two-panel workspace');
+assert(launchOptions && launchOptions.width === 560, 'Actual controller launch must expose the fixed two-panel workspace');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
@@ -157,7 +157,7 @@ assert(launchOptions && launchOptions.width >= 780, 'Actual controller launch mu
       return { preview: { x: preview.x, y: preview.y, right: preview.right }, workflow: { x: workflow.x, y: workflow.y } };
     });
     assert(initialPanels.preview.right <= initialPanels.workflow.x, 'Wide view has side-by-side preview and workflow');
-    assert(await page.locator('#panelDivider').isVisible(), 'Divider is visible at the actual Figma launch size');
+    assert.equal(await page.locator('#panelDivider').count(), 0, 'Panel divider has been removed');
     assert(await page.locator('#pluginVersion').isVisible(), 'The running UI identifies itself as v12');
     assert.equal(await page.locator('#pluginVersion').textContent(), 'v12.0');
     assert.equal(await page.evaluate(() => state.zoom), 0.5, 'Frame selection retains the existing default zoom');
@@ -175,7 +175,8 @@ assert(launchOptions && launchOptions.width >= 780, 'Actual controller launch mu
     const customColumns = (await geometry()).columns['0'];
     assert.equal(customColumns.length, 2);
     assert(customColumns.includes(300));
-    assert(Math.abs(customColumns.find(value => value !== 300) - 450) < 1, 'Manual cuts map pointer coordinates back to the design within pixel rounding');
+    const pointerPixel = 1 / await page.evaluate(() => canvasScale());
+    assert(Math.abs(customColumns.find(value => value !== 300) - 450) <= pointerPixel, 'Manual cuts map pointer coordinates within one rendered pointer pixel');
     await clickDesign(450, 200); // Clicking the existing guide removes that cut.
     assert.deepEqual((await geometry()).columns['0'], [300]);
     await page.locator('#undoBtn').click();
@@ -232,16 +233,8 @@ assert(launchOptions && launchOptions.width >= 780, 'Actual controller launch mu
     assert.deepEqual(await geometry(), preserved, 'Reviewing a preview label must not create or change cuts');
     await page.locator('#canvas button.slice-label').first().click();
     assert.equal(await page.evaluate(() => state.activeReviewIndex), 0);
-    // Split changes and view-only interactions must never mutate slice data.
-    const divider = page.locator('#panelDivider');
+    // View-only interactions must never mutate slice data.
     await page.locator('#workspace').evaluate(element => element.scrollTo(0, 0)); await settle();
-    const dividerBox = await divider.boundingBox(), workspaceBox = await page.locator('#workspace').boundingBox();
-    const dividerY = Math.max(dividerBox.y, workspaceBox.y) + Math.min(40, workspaceBox.height / 2);
-    await page.mouse.move(dividerBox.x + dividerBox.width / 2, dividerY);
-    await page.mouse.down(); await page.mouse.move(dividerBox.x + dividerBox.width / 2 + 60, dividerY, { steps: 5 }); await page.mouse.up();
-    await page.waitForFunction(() => typeof window.__savedPanelRatio === 'number' && window.__savedPanelRatio !== 0.38);
-    assert.notEqual(savedPanelRatio, 0.38, 'Divider saves the changed panel proportion');
-    await divider.focus(); await divider.press('ArrowRight');
     await page.locator('#zoomInBtn').click(); await page.locator('#zoomOutBtn').click(); await page.locator('#fitBtn').click();
     const beforeKeyboardZoom = await page.evaluate(() => state.zoom);
     await page.locator('#zoomInBtn').focus(); await page.keyboard.press('Control+=');
@@ -257,8 +250,8 @@ assert(launchOptions && launchOptions.width >= 780, 'Actual controller launch mu
     await page.locator('#previewWrap').evaluate(el => { el.scrollTop = 50; el.scrollLeft = 10; });
     assert.deepEqual(await geometry(), preserved);
     const preferenceMessages = await hostRequests('SAVE_UI_PREFERENCES');
-    assert(preferenceMessages.every(message => typeof message.panelRatio === 'number' && message.panelRatio > 0 && message.panelRatio < 1));
-    assert(preferenceMessages.every(message => !Object.keys(message).some(key => /zoom/i.test(key))), 'Only panel proportions are persisted, never preview zoom');
+    assert.deepEqual(preferenceMessages, [], 'Fixed panels never persist retired divider preferences');
+    assert.deepEqual(await hostRequests('GET_UI_PREFERENCES'), [], 'Fixed layout never restores retired preferences');
     await page.locator('#wideViewBtn').click();
     await page.waitForFunction(() => window.__hostRequests.some(message => message.type === 'UI_RESIZE'));
     assert((await hostRequests('UI_RESIZE')).length > 0, 'Window expansion uses the Figma-host resize message');
@@ -273,7 +266,7 @@ assert(launchOptions && launchOptions.width >= 780, 'Actual controller launch mu
       assert(layout.scrollWidth <= layout.innerWidth + 1, `No horizontal document overflow at ${width}×${height}`);
       assert(await page.locator('#pluginVersion').isVisible(), 'Running UI version remains discoverable at every window width');
       assert(layout.workspaceScrollWidth <= layout.workspaceWidth + 1, `No horizontal workflow overflow at ${width}×${height}`);
-      if (width < 780) assert(layout.previewBottom <= layout.workflowTop + 1, 'Narrow view stacks preview above controls');
+      if (width < 552) assert(layout.previewBottom <= layout.workflowTop + 1, 'Narrow view stacks preview above controls');
       else assert(layout.previewRight <= layout.workflowLeft + 1, 'Usable widths retain two columns');
       await page.locator('#createStep').scrollIntoViewIfNeeded();
       assert(await page.locator('#createStep').isVisible(), 'The final action area remains reachable by scrolling');
@@ -378,11 +371,11 @@ assert(launchOptions && launchOptions.width >= 780, 'Actual controller launch mu
     assert.equal(await page.evaluate(() => state.exporting), false);
     assert(!await page.locator('#prepareKlaviyo').isDisabled());
 
-    // Restoring UI preferences leaves preview zoom at the existing frame default.
-    assert(savedPanelRatio > 0 && savedPanelRatio < 1);
-    const persistedRatio = savedPanelRatio;
+    // Reloading or receiving a retired preference cannot change the fixed layout.
     await page.reload(); await revealFrame();
-    await page.waitForFunction(expected => Math.abs(parseFloat(getComputedStyle(document.querySelector('.workspace-layout')).getPropertyValue('--preview-ratio')) / 100 - expected) < 0.001, persistedRatio);
+    const fixedEditorWidth = await page.locator('#workflowPanel').evaluate(element => element.getBoundingClientRect().width);
+    await post({ type: 'UI_PREFERENCES', panelRatio: .60, width: 1600, zoom: 4 }); await settle();
+    assert.equal(await page.locator('#workflowPanel').evaluate(element => element.getBoundingClientRect().width), fixedEditorWidth);
     assert.equal(await page.evaluate(() => state.zoom), 0.5);
     const workingFrameBeforeCanvasError = await page.evaluate(() => JSON.stringify({ frame: state.frame, cuts: state.horizontalCuts, alt: state.altTextOverrides, cta: state.altCtaBySlice, urls: state.sliceUrlOverrides }));
     await post({ type: 'SELECTION_ERROR', message: 'Select exactly one email frame, component, or instance.' });
@@ -391,6 +384,6 @@ assert(launchOptions && launchOptions.width >= 780, 'Actual controller launch mu
     assert.equal(await page.evaluate(() => JSON.stringify({ frame: state.frame, cuts: state.horizontalCuts, alt: state.altTextOverrides, cta: state.altCtaBySlice, urls: state.sliceUrlOverrides })), workingFrameBeforeCanvasError);
     assert.match(await page.locator('#status').textContent(), /Select exactly one/);
     assert.deepEqual(errors, []);
-    console.log(`PASS: ${manifest.ui} five-step redesign preserves slicing, coordinates across split/resize/zoom, review edits/CTA/URLs, keyboard controls, preferences without zoom, export/upload/template contracts, and actionable error recovery; responsive layouts and non-overlapping notification dock verified.`);
+    console.log(`PASS: ${manifest.ui} five-step workflow preserves slicing, coordinates across resize/zoom, review edits/CTA/URLs, keyboard controls, fixed panels without preferences, export/upload/template contracts, and actionable error recovery; responsive layouts and notification dock verified.`);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
